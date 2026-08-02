@@ -1,0 +1,162 @@
+{
+  "id": "sesbania-grandiflora",
+  "scientific_name": "Sesbania grandiflora",
+  "family": {
+    "en": "Fabaceae (Papilionaceae)",
+    "ml": "ഫാബേസീ (പ്രാപ്പിലിയോണേസി)"
+  },
+  "common_name": {
+    "en": "Agathi",
+    "ml": "അകത്തി"
+  },
+  "other_names": {
+    "en": {
+      "sanskrit": [
+        "Agasti",
+        "Agastya",
+        "Munitaru",
+        "Vangasenaka"
+      ]
+    },
+    "ml": {
+      "sanskrit": [
+        "അഗസ്തി",
+        "അഗസ്ത്യ",
+        "മുനിതരു",
+        "വംഗസേനക"
+      ]
+    }
+  },
+  "overview": {
+    "en": "Agathi is a fast-growing medicinal tree widely used in Ayurveda. Almost every part of the plant, including its leaves, flowers, bark, pods, and seeds, is considered medicinal.",
+    "ml": "ആയുർവേദത്തിൽ വ്യാപകമായി ഉപയോഗിക്കുന്ന ഒരു ഔഷധവൃക്ഷമാണ് അകത്തി. ഇതിന്റെ ഇല, പൂവ്, തൊലി, കായ്, വിത്ത് എന്നിവയെല്ലാം ഔഷധഗുണമുള്ളവയാണ്."
+  },
+  "medicinal_uses": {
+    "en": [
+      "Smallpox",
+      "Epilepsy",
+      "Skin diseases",
+      "Weak eyesight",
+      "Night blindness",
+      "Anaemia"
+    ],
+    "ml": [
+      "വസൂരി",
+      "അപസ്മാരം",
+      "ചർമ്മരോഗങ്ങൾ",
+      "കണ്ണിന്റെ ബലക്കുറവ്",
+      "നിശാന്ധത",
+      "വിളർച്ച"
+    ]
+  },
+  "plant_characteristics": {
+    "en": "The plant is believed to be associated with Sage Agastya, from whom it derives its name. The bark is smooth when young but becomes cracked with age. There are two varieties: white and red Agathi. Its pods are long and slender. The bark, leaves, flowers, and pods are all medicinal. The leaves are rich in vitamins.",
+    "ml": "അഗസ്ത്യമുനിയുടെ പ്രിയപ്പെട്ട സസ്യമെന്ന നിലയിലാണ് അകത്തി എന്ന പേര് ലഭിച്ചത്. മരത്തിന്റെ തൊലി ചെറുപ്പത്തിൽ മിനുസമുള്ളതും പിന്നീട് വിണ്ടുകീറുന്നതുമാണ്. വെള്ള അകത്തിയും ചുവന്ന അകത്തിയും എന്നിങ്ങനെ രണ്ട് ഇനങ്ങളുണ്ട്. നീളമുള്ള കായ്കൾ ഉണ്ടാകുന്നു. തൊലി, ഇല, പൂവ്, കായ് എന്നിവ ഔഷധയോഗ്യമാണ്. ഇലയിൽ ധാരാളം വിറ്റാമിനുകൾ അടങ്ങിയിരിക്കുന്നു."
+  },
+  "habitat": {
+    "en": "Commonly grows throughout tropical regions without requiring special climatic conditions.",
+    "ml": "പ്രത്യേക കാലാവസ്ഥ ആവശ്യമില്ലാതെ സാധാരണയായി എല്ലായിടത്തും വളരുന്ന ഒരു സസ്യമാണ്."
+  },
+  "medicinal_properties": {
+    "en": "Agathi is highly valued in traditional medicine. It is used for headaches, cough, bile disorders, blood impurities, arthritis, phlegm, fever, tuberculosis, sinus problems, intestinal worms, jaundice, poisoning, constipation, improving intelligence, and uterine disorders.",
+    "ml": "ഔഷധസസ്യങ്ങളിൽ ഏറെ പ്രാധാന്യമുള്ള ഒന്നാണ് അകത്തി. തലവേദന, ചുമ, പിത്തം, രക്തദോഷം, വാതം, കഫം, പനി, ക്ഷയം, പീനസം, കുടൽവിര, പാണ്ഡുരോഗം, വിഷബാധ, മലബന്ധം, ബുദ്ധിവർധനം, ഗർഭാശയ സംബന്ധമായ പ്രശ്നങ്ങൾ എന്നിവയ്ക്ക് ഉപയോഗിക്കുന്നു."
+  },
+  "chemical_constituents": {
+    "en": {
+      "bark": "Tannins and red pigments.",
+      "sprouted_seeds": "Rich in Vitamin C.",
+      "leaves": "Protein, Calcium, Phosphorus, Iron, Vitamins A, B, and C.",
+      "flowers": "Protein, Fat, Carbohydrates, Phosphorus, Vitamins B and C.",
+      "seeds": "Protein, Fat, Carbohydrates, Oleanolic acid."
+    },
+    "ml": {
+      "തൊലി": "ടാനിൻ, രക്തവർണ്ണ പദാർത്ഥങ്ങൾ.",
+      "മുളച്ച വിത്ത്": "വിറ്റാമിൻ C ധാരാളം.",
+      "ഇല": "പ്രോട്ടീൻ, കാൽസ്യം, ഫോസ്ഫറസ്, ഇരുമ്പ്, വിറ്റാമിൻ A, B, C.",
+      "പൂവ്": "പ്രോട്ടീൻ, കൊഴുപ്പ്, കാർബോഹൈഡ്രേറ്റ്, ഫോസ്ഫറസ്, വിറ്റാമിൻ B, C.",
+      "വിത്ത്": "പ്രോട്ടീൻ, കൊഴുപ്പ്, കാർബോഹൈഡ്രേറ്റ്, ഒലിയാനോളിക് ആസിഡ്."
+    }
+  },
+  "treatments": [
+    {
+      "condition": {
+        "en": "Smallpox",
+        "ml": "വസൂരി"
+      },
+      "remedy": {
+        "en": "Boiled bark decoction is effective during the early stage of smallpox.",
+        "ml": "വസൂരിയുടെ ആരംഭഘട്ടത്തിൽ അഗസ്തിയുടെ പട്ട തിളപ്പിച്ച വെള്ളം ഉപയോഗിക്കുന്നു."
+      }
+    },
+    {
+      "condition": {
+        "en": "Epilepsy",
+        "ml": "അപസ്മാരം"
+      },
+      "remedy": {
+        "en": "Grind Agathi leaves with black pepper in cow's ghee and use as medicine.",
+        "ml": "അകത്തിയിലയും കുരുമുളകും ഗോഘൃതത്തിൽ അരച്ച് മരുന്നായി ഉപയോഗിക്കുന്നു."
+      }
+    },
+    {
+      "condition": {
+        "en": "Skin Diseases",
+        "ml": "ചർമ്മരോഗങ്ങൾ"
+      },
+      "remedy": {
+        "en": "Apply a paste of the leaves mixed with coconut oil on the affected area.",
+        "ml": "അകത്തിയില അരച്ച് വെളിച്ചെണ്ണയിൽ കലർത്തി ശരീരത്തിൽ പുരട്ടുന്നു."
+      }
+    },
+    {
+      "condition": {
+        "en": "Weak Eyesight",
+        "ml": "കണ്ണിന്റെ ബലക്കുറവ്"
+      },
+      "remedy": {
+        "en": "Fresh flower juice is traditionally applied to improve eyesight.",
+        "ml": "അകത്തിപ്പൂവിന്റെ ചാറ് കണ്ണിൽ ഒഴിക്കുന്നു."
+      }
+    },
+    {
+      "condition": {
+        "en": "Night Blindness",
+        "ml": "നിശാന്ധത"
+      },
+      "remedy": {
+        "en": "Flowers fried in ghee are consumed twice daily.",
+        "ml": "നെയ്യിൽ വറുത്ത പൂവ് ദിവസേന രണ്ടുനേരം കഴിക്കുന്നു."
+      }
+    },
+    {
+      "condition": {
+        "en": "Rheumatism",
+        "ml": "പരുപെട്ടുവാതം"
+      },
+      "remedy": {
+        "en": "Boiled and powdered seeds are mixed with milk and consumed.",
+        "ml": "വിത്ത് പാലിൽ വേവിച്ച് പൊടിയാക്കി പാലിൽ ചേർത്ത് കഴിക്കുന്നു."
+      }
+    },
+    {
+      "condition": {
+        "en": "Anaemia",
+        "ml": "വിളർച്ച"
+      },
+      "remedy": {
+        "en": "Leaf preparation with green wheat porridge is traditionally used.",
+        "ml": "അകത്തിയില ഗോതമ്പ് പച്ച കഞ്ഞിയോടൊപ്പം ഉപയോഗിക്കുന്നു."
+      }
+    },
+    {
+      "condition": {
+        "en": "Excess Menstrual or Vaginal Discharge",
+        "ml": "അനമിസ്രാവം, പുഷ്പസ്രാവം"
+      },
+      "remedy": {
+        "en": "Fresh flower juice mixed with milk is traditionally consumed.",
+        "ml": "അകത്തിപ്പൂവിന്റെ നീര് പാലിൽ കലർത്തി കുടിക്കുന്നു."
+      }
+    }
+  ]
+}
