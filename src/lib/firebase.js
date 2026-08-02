@@ -10,7 +10,7 @@ import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAbVJq33hO7zFHAAFePuXZ2YyKFzWqH8-U",
-  authDomain: "nattuvaidyamin.firebaseapp.com",
+  authDomain: "nattuvaidyam.in",
   projectId: "nattuvaidyamin",
   storageBucket: "nattuvaidyamin.firebasestorage.app",
   messagingSenderId: "200867729800",

@@ -1,4 +1,4 @@
-const CACHE_NAME = "nattuvaidyam-shell-v2";
+const CACHE_NAME = "nattuvaidyam-shell-v3";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest?v=20260802a",
@@ -6,6 +6,8 @@ const APP_SHELL = [
   "/favicon/favicon.svg?v=20260802a",
   "/favicon/favicon-96x96.png?v=20260802a",
   "/favicon/apple-touch-icon.png?v=20260802a",
+  "/favicon/web-app-manifest-192x192.png?v=20260802a",
+  "/favicon/web-app-manifest-512x512.png?v=20260802a",
 ];
 
 self.addEventListener("install", (event) => {

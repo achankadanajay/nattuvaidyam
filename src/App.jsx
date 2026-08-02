@@ -1,7 +1,8 @@
 import { onAuthStateChanged } from "firebase/auth";
-import { useDeferredValue, useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { auth, signInWithGoogle, signOutUser } from "./lib/firebase";
 import {
+  deletePlantRecord,
   fetchPlantsFromFirestore,
   getSearchResult,
   getTopTerms,
@@ -15,6 +16,8 @@ import {
 
 const MOBILE_APP_BREAKPOINT = 720;
 const ADMIN_EMAIL = "ajyghosh@gmail.com";
+const SEARCH_RESULTS_BATCH_SIZE = 24;
+const LANGUAGE_STORAGE_KEY = "nattuvaidyam-language";
 
 const content = {
   ml: {
@@ -38,7 +41,7 @@ const content = {
       placeholder: "ഉദാ: ചുമ, പ്രമേഹം, ദഹനപ്രശ്നങ്ങൾ",
       mobileSearchLabel: "സസ്യങ്ങൾ, ലക്ഷണങ്ങൾ, രോഗങ്ങൾ തിരയുക",
       buttonLabel: "തിരയുക",
-      quickTags: ["ചുമ", "പനി", "ത്വക്ക് പ്രശ്നങ്ങൾ", "പ്രമേഹം"],
+      quickTags: ["ചുമ", "പനി", "ത്വക്ക്", "പ്രമേഹം"],
     },
     featured: {
       kicker: "ഹോം ഹൈലൈറ്റുകൾ",
@@ -86,7 +89,7 @@ const content = {
     },
     saved: {
       title: "സേവ് ചെയ്ത സസ്യങ്ങൾ",
-      searchPlaceholder: "സേവ് ചെയ്ത സസ്യങ്ങൾ തിരയൂ",
+      searchPlaceholder: "സസ്യം, രോഗം, ലക്ഷണം എന്നിവ തിരയൂ",
       clearSearch: "നീക്കുക",
       signedOutTitle: "സേവ് ചെയ്യാൻ സൈൻ ഇൻ ചെയ്യൂ",
       signedOutDescription:
@@ -107,6 +110,12 @@ const content = {
       signIn: "Google ഉപയോഗിച്ച് സൈൻ ഇൻ",
       signOut: "സൈൻ ഔട്ട്",
       favoritesLabel: "സേവ് ചെയ്ത സസ്യങ്ങൾ",
+      languageLabel: "ഇഷ്ടഭാഷ",
+      languageNote: "ഇവിടെ തിരഞ്ഞെടുക്കുന്ന ഭാഷ പിന്നീട് default ആയി തുടരാം.",
+      languageChoices: {
+        en: "English",
+        ml: "Malayalam",
+      },
       note: "നിങ്ങൾ save ചെയ്യുന്ന സസ്യങ്ങൾ പിന്നീട് എളുപ്പത്തിൽ വീണ്ടും കാണാനായി നിങ്ങളുടെ അക്കൗണ്ടിൽ സൂക്ഷിക്കും.",
     },
     stats: {
@@ -139,6 +148,7 @@ const content = {
       savedLabel: "സേവ് ചെയ്തു",
       signInToSave: "സേവ് ചെയ്യാൻ സൈൻ ഇൻ",
       allResultsLabel: "ഫലങ്ങൾ",
+      loadMoreLabel: "കൂടുതൽ കാണിക്കുക",
       filtersCountLabel: "ഫിൽട്ടറുകൾ",
       activeFilterLabel: "ഫിൽട്ടർ സജീവമാണ്",
       activeFiltersLabel: "ഫിൽട്ടറുകൾ സജീവമാണ്",
@@ -172,6 +182,15 @@ const content = {
     footerLabel: "അറിയിപ്പ്",
     footer:
       "ഈ വെബ്സൈറ്റ് വിദ്യാഭ്യാസ ആവശ്യങ്ങൾക്കായാണ്. ചികിത്സയ്ക്കായി ഔഷധസസ്യങ്ങൾ ഉപയോഗിക്കുന്നതിന് മുമ്പ് യോഗ്യനായ ആരോഗ്യവിദഗ്ധന്റെ ഉപദേശം തേടുക.",
+    confirm: {
+      cancel: "റദ്ദാക്കുക",
+      signOutTitle: "സൈൻ ഔട്ട് ചെയ്യണോ?",
+      signOutDescription: "ഈ ഉപകരണത്തിൽ നിന്ന് നിങ്ങളുടെ അക്കൗണ്ട് സൈൻ ഔട്ട് ചെയ്യും.",
+      signOutAction: "സൈൻ ഔട്ട്",
+      deleteTitle: "ഈ രേഖ നീക്കണോ?",
+      deleteDescription: "ഇത് Firestore-ൽ നിന്ന് സ്ഥിരമായി നീക്കം ചെയ്യും.",
+      deleteAction: "ഡിലീറ്റ് ചെയ്യുക",
+    },
   },
   en: {
     brandTitle: "Nattuvaidyam",
@@ -191,7 +210,7 @@ const content = {
       title: "Discover Kerala's medicinal plants in one place",
       description:
         "Search Kerala's medicinal plants using a disease, symptom, or plant name. Explore traditional knowledge in a clean and easy-to-browse format.",
-      placeholder: "Search by cough, diabetes, digestion, skin care",
+      placeholder: "Search by plant, cough, diabetes, skin care",
       mobileSearchLabel: "Search plants, symptoms, diseases",
       buttonLabel: "Search",
       quickTags: ["Cough", "Fever", "Skin care", "Diabetes"],
@@ -242,7 +261,7 @@ const content = {
     },
     saved: {
       title: "Saved plants",
-      searchPlaceholder: "Search saved plants",
+      searchPlaceholder: "Search plants, diseases, symptoms",
       clearSearch: "Clear",
       signedOutTitle: "Sign in to save plants",
       signedOutDescription:
@@ -263,6 +282,12 @@ const content = {
       signIn: "Continue with Google",
       signOut: "Sign out",
       favoritesLabel: "Saved plants",
+      languageLabel: "Preferred language",
+      languageNote: "Your selection here will be saved as the default language.",
+      languageChoices: {
+        en: "English",
+        ml: "Malayalam",
+      },
       note: "Plants you save stay available in your account so you can come back to them later.",
     },
     stats: {
@@ -296,6 +321,7 @@ const content = {
       savedLabel: "Saved",
       signInToSave: "Sign in to save",
       allResultsLabel: "results",
+      loadMoreLabel: "Load more",
       filtersCountLabel: "filters",
       activeFilterLabel: "active filter",
       activeFiltersLabel: "active filters",
@@ -329,6 +355,15 @@ const content = {
     footerLabel: "Disclaimer",
     footer:
       "This website is intended for educational purposes. Always consult a qualified healthcare professional before using medicinal plants for treatment.",
+    confirm: {
+      cancel: "Cancel",
+      signOutTitle: "Sign out?",
+      signOutDescription: "This will sign your account out on this device.",
+      signOutAction: "Sign out",
+      deleteTitle: "Delete this record?",
+      deleteDescription: "This will permanently remove the plant from Firestore.",
+      deleteAction: "Delete",
+    },
   },
 };
 
@@ -399,75 +434,132 @@ function getInitialAppState() {
     return {
       language: "en",
       page: "home",
+      adminSection: "home",
       catalogSeed: { query: "", openDetail: false },
       selectedPlantSlug: null,
+      plantDetailOpen: false,
     };
   }
 
-  const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
-  if (pathname === "/admin") {
+  const url = new URL(window.location.href);
+  const pathname = url.pathname.replace(/\/+$/, "") || "/";
+  const segments = pathname
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => decodeURIComponent(segment));
+  const params = url.searchParams;
+  const storedLanguage =
+    window.localStorage.getItem(LANGUAGE_STORAGE_KEY) === "ml" ? "ml" : "en";
+  const language = params.has("lang")
+    ? params.get("lang") === "ml"
+      ? "ml"
+      : "en"
+    : storedLanguage;
+
+  if (pathname === "/admin" || pathname === "/admin/new" || pathname === "/admin/edit") {
     return {
-      language: "en",
+      language,
       page: "admin",
+      adminSection:
+        pathname === "/admin/new"
+          ? "new"
+          : pathname === "/admin/edit"
+            ? "edit"
+            : "home",
       catalogSeed: { query: "", openDetail: false },
       selectedPlantSlug: null,
+      plantDetailOpen: false,
     };
   }
 
-  const params = new URLSearchParams(window.location.search);
-  const language = params.get("lang") === "ml" ? "ml" : "en";
-  const requestedPage = params.get("page");
-  const query = params.get("q")?.trim() ?? "";
-  const selectedPlantSlug = params.get("plant")?.trim() || null;
-  const page = ["home", "plants", "saved", "me"].includes(requestedPage)
-    ? requestedPage
-    : selectedPlantSlug || query
-      ? "plants"
-      : "home";
+  let page = "home";
+  let query = params.get("q")?.trim() ?? "";
+  let selectedPlantSlug = null;
+  let plantDetailOpen = false;
+
+  if (segments[0] === "saved") {
+    page = "saved";
+  } else if (segments[0] === "me") {
+    page = "me";
+  } else if (segments[0] === "search") {
+    page = "plants";
+  } else if (segments[0] === "plants" && segments[1]) {
+    page = "plants";
+    selectedPlantSlug = segments.slice(1).join("/");
+    plantDetailOpen = true;
+  } else {
+    const requestedPage = params.get("page");
+    const legacySelectedPlantSlug = params.get("plant")?.trim() || null;
+    page = ["home", "plants", "saved", "me"].includes(requestedPage)
+      ? requestedPage
+      : legacySelectedPlantSlug || query
+        ? "plants"
+        : "home";
+    selectedPlantSlug = legacySelectedPlantSlug;
+    plantDetailOpen = Boolean(legacySelectedPlantSlug);
+  }
 
   return {
     language,
     page,
+    adminSection: "home",
     catalogSeed: {
       query,
-      openDetail: Boolean(selectedPlantSlug),
+      openDetail: plantDetailOpen,
     },
     selectedPlantSlug,
+    plantDetailOpen,
   };
 }
 
-function buildAppUrl({ language, page, query = "", plantSlug = null }) {
+function buildAppUrl({
+  language,
+  page,
+  query = "",
+  plantSlug = null,
+  adminSection = "home",
+  detailOpen = false,
+}) {
   if (typeof window === "undefined") {
     return "";
   }
 
   const url = new URL(window.location.href);
-  const pathname = page === "admin" ? "/admin" : "/";
 
   url.searchParams.delete("lang");
   url.searchParams.delete("page");
   url.searchParams.delete("q");
   url.searchParams.delete("plant");
 
+  if (page === "admin") {
+    url.pathname =
+      adminSection === "new"
+        ? "/admin/new"
+        : adminSection === "edit"
+          ? "/admin/edit"
+          : "/admin";
+    url.hash = "";
+    return `${url.origin}${url.pathname}${url.search}`;
+  }
+
   if (language === "ml") {
     url.searchParams.set("lang", language);
   }
 
-  if (page && page !== "home") {
-    url.searchParams.set("page", page);
-  }
-
-  if (page === "plants") {
+  if (page === "saved") {
+    url.pathname = "/saved";
+  } else if (page === "me") {
+    url.pathname = "/me";
+  } else if (page === "plants") {
+    url.pathname =
+      detailOpen && plantSlug ? `/plants/${encodeURIComponent(plantSlug)}` : "/search";
     if (query.trim()) {
       url.searchParams.set("q", query.trim());
     }
-
-    if (plantSlug) {
-      url.searchParams.set("plant", plantSlug);
-    }
+  } else {
+    url.pathname = "/";
   }
 
-  url.pathname = pathname;
   url.hash = "";
   return `${url.origin}${url.pathname}${url.search}`;
 }
@@ -502,7 +594,6 @@ function createEmptyAdminForm() {
   return {
     id: "",
     scientificName: "",
-    icon: "🌿",
     commonNameEn: "",
     commonNameMl: "",
     familyEn: "",
@@ -524,6 +615,15 @@ function createEmptyAdminForm() {
     aliases: [createEmptyAliasRow()],
     constituents: [createEmptyConstituentRow()],
     treatments: [createEmptyTreatmentRow()],
+  };
+}
+
+function createEmptyJsonImportMedia() {
+  return {
+    imageAltEn: "",
+    imageAltMl: "",
+    imageFileDataUrl: "",
+    imageFileName: "",
   };
 }
 
@@ -654,7 +754,6 @@ function buildPlantRecordFromForm(form) {
       ml: constituentsMl,
     },
     treatments,
-    ...(form.icon.trim() ? { icon: form.icon.trim() } : {}),
     ...(imageSrc
       ? {
           image: {
@@ -705,6 +804,139 @@ function normalizeImportedPlantRecord(record) {
     ...record,
     id,
   };
+}
+
+function applyImportedImage(record, jsonImportMedia) {
+  const imageSrc = jsonImportMedia.imageFileDataUrl;
+
+  if (!imageSrc) {
+    return record;
+  }
+
+  return {
+    ...record,
+    image: {
+      src: imageSrc,
+      alt: {
+        en:
+          jsonImportMedia.imageAltEn.trim() ||
+          record.image?.alt?.en ||
+          record.common_name?.en ||
+          record.scientific_name ||
+          "",
+        ml:
+          jsonImportMedia.imageAltMl.trim() ||
+          record.image?.alt?.ml ||
+          record.common_name?.ml ||
+          record.scientific_name ||
+          "",
+      },
+    },
+  };
+}
+
+function joinListForForm(value) {
+  return Array.isArray(value) ? value.join(", ") : "";
+}
+
+function mapPlantRecordToForm(record) {
+  const aliasCategories = Array.from(
+    new Set([
+      ...Object.keys(record.other_names?.en ?? {}),
+      ...Object.keys(record.other_names?.ml ?? {}),
+    ]),
+  );
+
+  const aliases = aliasCategories.length
+    ? aliasCategories.map((category) => ({
+        category,
+        en: joinListForForm(record.other_names?.en?.[category]),
+        ml: joinListForForm(record.other_names?.ml?.[category]),
+      }))
+    : [createEmptyAliasRow()];
+
+  const constituentParts = Array.from(
+    new Set([
+      ...Object.keys(record.chemical_constituents?.en ?? {}),
+      ...Object.keys(record.chemical_constituents?.ml ?? {}),
+    ]),
+  );
+
+  const constituents = constituentParts.length
+    ? constituentParts.map((partEnOrMl) => ({
+        partEn:
+          Object.keys(record.chemical_constituents?.en ?? {}).find(
+            (key) => key === partEnOrMl,
+          ) ?? "",
+        descriptionEn: record.chemical_constituents?.en?.[partEnOrMl] ?? "",
+        partMl:
+          Object.keys(record.chemical_constituents?.ml ?? {}).find(
+            (key) => key === partEnOrMl,
+          ) ?? "",
+        descriptionMl: record.chemical_constituents?.ml?.[partEnOrMl] ?? "",
+      }))
+    : [createEmptyConstituentRow()];
+
+  const treatments = Array.isArray(record.treatments) && record.treatments.length
+    ? record.treatments.map((entry) => ({
+        conditionEn: entry.condition?.en ?? "",
+        conditionMl: entry.condition?.ml ?? "",
+        remedyEn: entry.remedy?.en ?? "",
+        remedyMl: entry.remedy?.ml ?? "",
+      }))
+    : [createEmptyTreatmentRow()];
+
+  return {
+    id: record.id ?? "",
+    scientificName: record.scientific_name ?? "",
+    commonNameEn: record.common_name?.en ?? "",
+    commonNameMl: record.common_name?.ml ?? "",
+    familyEn: record.family?.en ?? "",
+    familyMl: record.family?.ml ?? "",
+    overviewEn: record.overview?.en ?? "",
+    overviewMl: record.overview?.ml ?? "",
+    medicinalUsesEn: joinListForForm(record.medicinal_uses?.en),
+    medicinalUsesMl: joinListForForm(record.medicinal_uses?.ml),
+    characteristicsEn: record.plant_characteristics?.en ?? "",
+    characteristicsMl: record.plant_characteristics?.ml ?? "",
+    habitatEn: record.habitat?.en ?? "",
+    habitatMl: record.habitat?.ml ?? "",
+    medicinalPropertiesEn: record.medicinal_properties?.en ?? "",
+    medicinalPropertiesMl: record.medicinal_properties?.ml ?? "",
+    imageUrl: record.image?.src ?? "",
+    imageAltEn: record.image?.alt?.en ?? "",
+    imageAltMl: record.image?.alt?.ml ?? "",
+    imageFileDataUrl: "",
+    aliases,
+    constituents,
+    treatments,
+  };
+}
+
+function createEmptyAdminImageForm() {
+  return {
+    plantId: "",
+    imageFileDataUrl: "",
+    imageFileName: "",
+    imageDescriptionEn: "",
+    imageDescriptionMl: "",
+    currentImageSrc: "",
+  };
+}
+
+function mapPlantRecordToImageForm(record) {
+  return {
+    plantId: record.id ?? "",
+    imageFileDataUrl: "",
+    imageFileName: "",
+    imageDescriptionEn: record.image?.alt?.en ?? "",
+    imageDescriptionMl: record.image?.alt?.ml ?? "",
+    currentImageSrc: record.image?.src ?? "",
+  };
+}
+
+function getPlantDisplayName(record) {
+  return record.common_name?.en || record.scientific_name || record.id;
 }
 
 function getSavedCountValue(plant) {
@@ -797,21 +1029,23 @@ function Header({ copy, page, language, onNavigate, onLanguageChange, isScrolled
           ))}
         </nav>
 
-        <div className="language-switcher">
-          <div className="language-toggle" role="tablist" aria-label="Language switcher">
-            {Object.entries(copy.languageOptions).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                className={value === language ? "toggle-chip is-active" : "toggle-chip"}
-                onClick={() => onLanguageChange(value)}
-                aria-pressed={value === language}
-              >
-                {label}
-              </button>
-            ))}
+        {page === "me" ? (
+          <div className="language-switcher">
+            <div className="language-toggle" role="tablist" aria-label="Language switcher">
+              {Object.entries(copy.languageOptions).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={value === language ? "toggle-chip is-active" : "toggle-chip"}
+                  onClick={() => onLanguageChange(value)}
+                  aria-pressed={value === language}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </header>
   );
@@ -849,24 +1083,525 @@ function AuthPrompt({ title, description, actionLabel, onAction }) {
   );
 }
 
-function AdminPage({ user, onSignIn, onSignOut, onPlantsChanged }) {
+function ConfirmDialog({
+  isOpen,
+  title,
+  description,
+  confirmLabel,
+  cancelLabel,
+  onConfirm,
+  onCancel,
+  isDestructive = false,
+}) {
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div className="confirm-dialog-backdrop" onClick={onCancel}>
+      <section
+        className="confirm-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="confirm-dialog-copy">
+          <h3>{title}</h3>
+          {description ? <p>{description}</p> : null}
+        </div>
+        <div className="confirm-dialog-actions">
+          <button type="button" className="ghost-button" onClick={onCancel}>
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            className={isDestructive ? "confirm-dialog-button is-danger" : "confirm-dialog-button"}
+            onClick={() => void onConfirm()}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function AdminPlantForm({
+  title,
+  description,
+  form,
+  onFieldChange,
+  onArrayRowChange,
+  onAddArrayRow,
+  onRemoveArrayRow,
+  onImageUpload,
+  onSave,
+  onReset,
+  saveLabel,
+  resetLabel,
+  isSaving,
+  lockId = false,
+}) {
+  return (
+    <div className="admin-panel-grid">
+      <section className="admin-panel">
+        <div className="admin-section-head">
+          <div>
+            <h3>{title}</h3>
+            {description ? <p className="admin-section-copy">{description}</p> : null}
+          </div>
+        </div>
+        <div className="admin-form-grid">
+          <label className="admin-field">
+            <span>Plant ID</span>
+            <input
+              type="text"
+              value={form.id}
+              onChange={(event) => onFieldChange("id", event.target.value)}
+              placeholder="sesbania-grandiflora"
+              disabled={lockId}
+            />
+          </label>
+          <label className="admin-field">
+            <span>Scientific name</span>
+            <input
+              type="text"
+              value={form.scientificName}
+              onChange={(event) => onFieldChange("scientificName", event.target.value)}
+              placeholder="Sesbania grandiflora"
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="admin-panel">
+        <div className="admin-section-head">
+          <h3>Bilingual names</h3>
+        </div>
+        <div className="admin-form-grid two-column">
+          <label className="admin-field">
+            <span>Common name (English)</span>
+            <input
+              type="text"
+              value={form.commonNameEn}
+              onChange={(event) => onFieldChange("commonNameEn", event.target.value)}
+            />
+          </label>
+          <label className="admin-field">
+            <span>Common name (Malayalam)</span>
+            <input
+              type="text"
+              value={form.commonNameMl}
+              onChange={(event) => onFieldChange("commonNameMl", event.target.value)}
+            />
+          </label>
+          <label className="admin-field">
+            <span>Family (English)</span>
+            <input
+              type="text"
+              value={form.familyEn}
+              onChange={(event) => onFieldChange("familyEn", event.target.value)}
+            />
+          </label>
+          <label className="admin-field">
+            <span>Family (Malayalam)</span>
+            <input
+              type="text"
+              value={form.familyMl}
+              onChange={(event) => onFieldChange("familyMl", event.target.value)}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="admin-panel">
+        <div className="admin-section-head">
+          <h3>Overview and uses</h3>
+        </div>
+        <div className="admin-form-grid two-column">
+          <label className="admin-field">
+            <span>Overview (English)</span>
+            <textarea
+              rows="5"
+              value={form.overviewEn}
+              onChange={(event) => onFieldChange("overviewEn", event.target.value)}
+            />
+          </label>
+          <label className="admin-field">
+            <span>Overview (Malayalam)</span>
+            <textarea
+              rows="5"
+              value={form.overviewMl}
+              onChange={(event) => onFieldChange("overviewMl", event.target.value)}
+            />
+          </label>
+          <label className="admin-field">
+            <span>Medicinal uses (English)</span>
+            <textarea
+              rows="5"
+              value={form.medicinalUsesEn}
+              onChange={(event) => onFieldChange("medicinalUsesEn", event.target.value)}
+              placeholder="One per line or comma separated"
+            />
+          </label>
+          <label className="admin-field">
+            <span>Medicinal uses (Malayalam)</span>
+            <textarea
+              rows="5"
+              value={form.medicinalUsesMl}
+              onChange={(event) => onFieldChange("medicinalUsesMl", event.target.value)}
+              placeholder="One per line or comma separated"
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="admin-panel">
+        <div className="admin-section-head">
+          <h3>Plant details</h3>
+        </div>
+        <div className="admin-form-grid two-column">
+          <label className="admin-field">
+            <span>Plant characteristics (English)</span>
+            <textarea
+              rows="5"
+              value={form.characteristicsEn}
+              onChange={(event) => onFieldChange("characteristicsEn", event.target.value)}
+            />
+          </label>
+          <label className="admin-field">
+            <span>Plant characteristics (Malayalam)</span>
+            <textarea
+              rows="5"
+              value={form.characteristicsMl}
+              onChange={(event) => onFieldChange("characteristicsMl", event.target.value)}
+            />
+          </label>
+          <label className="admin-field">
+            <span>Habitat (English)</span>
+            <textarea
+              rows="4"
+              value={form.habitatEn}
+              onChange={(event) => onFieldChange("habitatEn", event.target.value)}
+            />
+          </label>
+          <label className="admin-field">
+            <span>Habitat (Malayalam)</span>
+            <textarea
+              rows="4"
+              value={form.habitatMl}
+              onChange={(event) => onFieldChange("habitatMl", event.target.value)}
+            />
+          </label>
+          <label className="admin-field">
+            <span>Medicinal properties (English)</span>
+            <textarea
+              rows="5"
+              value={form.medicinalPropertiesEn}
+              onChange={(event) => onFieldChange("medicinalPropertiesEn", event.target.value)}
+            />
+          </label>
+          <label className="admin-field">
+            <span>Medicinal properties (Malayalam)</span>
+            <textarea
+              rows="5"
+              value={form.medicinalPropertiesMl}
+              onChange={(event) => onFieldChange("medicinalPropertiesMl", event.target.value)}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="admin-panel">
+        <div className="admin-section-head">
+          <h3>Image</h3>
+        </div>
+        <div className="admin-form-grid">
+          <label className="admin-field">
+            <span>Upload image</span>
+            <input type="file" accept="image/*" onChange={onImageUpload} />
+          </label>
+          <label className="admin-field">
+            <span>Image description (English)</span>
+            <input
+              type="text"
+              value={form.imageAltEn}
+              onChange={(event) => onFieldChange("imageAltEn", event.target.value)}
+            />
+          </label>
+          <label className="admin-field">
+            <span>Image description (Malayalam)</span>
+            <input
+              type="text"
+              value={form.imageAltMl}
+              onChange={(event) => onFieldChange("imageAltMl", event.target.value)}
+            />
+          </label>
+        </div>
+        {form.imageFileDataUrl || form.imageUrl ? (
+          <div className="admin-image-preview">
+            <img
+              src={form.imageFileDataUrl || form.imageUrl}
+              alt={form.imageAltEn || form.commonNameEn || "Plant preview"}
+            />
+          </div>
+        ) : null}
+      </section>
+
+      <section className="admin-panel">
+        <div className="admin-section-head">
+          <h3>Other names</h3>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => onAddArrayRow("aliases", createEmptyAliasRow)}
+          >
+            Add row
+          </button>
+        </div>
+        <div className="admin-repeat-grid">
+          {form.aliases.map((row, index) => (
+            <div className="admin-repeat-card" key={`alias-${index}`}>
+              <div className="admin-form-grid three-column">
+                <label className="admin-field">
+                  <span>Category</span>
+                  <input
+                    type="text"
+                    value={row.category}
+                    onChange={(event) =>
+                      onArrayRowChange("aliases", index, "category", event.target.value)
+                    }
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>English names</span>
+                  <input
+                    type="text"
+                    value={row.en}
+                    onChange={(event) => onArrayRowChange("aliases", index, "en", event.target.value)}
+                    placeholder="Comma separated"
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Malayalam names</span>
+                  <input
+                    type="text"
+                    value={row.ml}
+                    onChange={(event) => onArrayRowChange("aliases", index, "ml", event.target.value)}
+                    placeholder="Comma separated"
+                  />
+                </label>
+              </div>
+              <button
+                type="button"
+                className="ghost-button admin-remove-button"
+                onClick={() => onRemoveArrayRow("aliases", index)}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="admin-panel">
+        <div className="admin-section-head">
+          <h3>Chemical constituents</h3>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => onAddArrayRow("constituents", createEmptyConstituentRow)}
+          >
+            Add row
+          </button>
+        </div>
+        <div className="admin-repeat-grid">
+          {form.constituents.map((row, index) => (
+            <div className="admin-repeat-card" key={`constituent-${index}`}>
+              <div className="admin-form-grid two-column">
+                <label className="admin-field">
+                  <span>Part (English)</span>
+                  <input
+                    type="text"
+                    value={row.partEn}
+                    onChange={(event) =>
+                      onArrayRowChange("constituents", index, "partEn", event.target.value)
+                    }
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Description (English)</span>
+                  <textarea
+                    rows="3"
+                    value={row.descriptionEn}
+                    onChange={(event) =>
+                      onArrayRowChange("constituents", index, "descriptionEn", event.target.value)
+                    }
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Part (Malayalam)</span>
+                  <input
+                    type="text"
+                    value={row.partMl}
+                    onChange={(event) =>
+                      onArrayRowChange("constituents", index, "partMl", event.target.value)
+                    }
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Description (Malayalam)</span>
+                  <textarea
+                    rows="3"
+                    value={row.descriptionMl}
+                    onChange={(event) =>
+                      onArrayRowChange("constituents", index, "descriptionMl", event.target.value)
+                    }
+                  />
+                </label>
+              </div>
+              <button
+                type="button"
+                className="ghost-button admin-remove-button"
+                onClick={() => onRemoveArrayRow("constituents", index)}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="admin-panel">
+        <div className="admin-section-head">
+          <h3>Treatments</h3>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => onAddArrayRow("treatments", createEmptyTreatmentRow)}
+          >
+            Add row
+          </button>
+        </div>
+        <div className="admin-repeat-grid">
+          {form.treatments.map((row, index) => (
+            <div className="admin-repeat-card" key={`treatment-${index}`}>
+              <div className="admin-form-grid two-column">
+                <label className="admin-field">
+                  <span>Condition (English)</span>
+                  <input
+                    type="text"
+                    value={row.conditionEn}
+                    onChange={(event) =>
+                      onArrayRowChange("treatments", index, "conditionEn", event.target.value)
+                    }
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Condition (Malayalam)</span>
+                  <input
+                    type="text"
+                    value={row.conditionMl}
+                    onChange={(event) =>
+                      onArrayRowChange("treatments", index, "conditionMl", event.target.value)
+                    }
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Remedy (English)</span>
+                  <textarea
+                    rows="3"
+                    value={row.remedyEn}
+                    onChange={(event) =>
+                      onArrayRowChange("treatments", index, "remedyEn", event.target.value)
+                    }
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Remedy (Malayalam)</span>
+                  <textarea
+                    rows="3"
+                    value={row.remedyMl}
+                    onChange={(event) =>
+                      onArrayRowChange("treatments", index, "remedyMl", event.target.value)
+                    }
+                  />
+                </label>
+              </div>
+              <button
+                type="button"
+                className="ghost-button admin-remove-button"
+                onClick={() => onRemoveArrayRow("treatments", index)}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="admin-submit-row">
+        <button type="button" className="admin-primary-button" onClick={() => void onSave()} disabled={isSaving}>
+          {isSaving ? "Saving..." : saveLabel}
+        </button>
+        {onReset ? (
+          <button type="button" className="ghost-button" onClick={onReset} disabled={isSaving}>
+            {resetLabel}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function AdminPage({
+  user,
+  plants,
+  adminSection,
+  confirmCopy,
+  onAdminNavigate,
+  onSignIn,
+  onSignOut,
+  onPlantsChanged,
+}) {
   const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL;
-  const [entryMode, setEntryMode] = useState("form");
-  const [form, setForm] = useState(() => createEmptyAdminForm());
+  const [newEntryMode, setNewEntryMode] = useState("form");
+  const [newForm, setNewForm] = useState(() => createEmptyAdminForm());
+  const [editForm, setEditForm] = useState(() => createEmptyAdminForm());
   const [jsonText, setJsonText] = useState("");
   const [jsonFileName, setJsonFileName] = useState("");
+  const [jsonImportMedia, setJsonImportMedia] = useState(() => createEmptyJsonImportMedia());
+  const [editingPlantId, setEditingPlantId] = useState("");
+  const [adminSearchQuery, setAdminSearchQuery] = useState("");
+  const [pendingDeleteRecord, setPendingDeleteRecord] = useState(null);
   const [feedback, setFeedback] = useState({ tone: "", message: "" });
   const [isSaving, setIsSaving] = useState(false);
+  const deferredAdminSearchQuery = useDeferredValue(adminSearchQuery.trim());
 
-  function updateFormField(key, value) {
-    setForm((current) => ({
+  useEffect(() => {
+    if (!feedback.message) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setFeedback({ tone: "", message: "" });
+    }, 3000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [feedback]);
+
+  function updateFormField(setter, key, value) {
+    setter((current) => ({
       ...current,
       [key]: value,
     }));
   }
 
-  function updateArrayRow(key, index, field, value) {
-    setForm((current) => ({
+  function updateArrayRow(setter, key, index, field, value) {
+    setter((current) => ({
       ...current,
       [key]: current[key].map((row, rowIndex) =>
         rowIndex === index
@@ -879,21 +1614,24 @@ function AdminPage({ user, onSignIn, onSignOut, onPlantsChanged }) {
     }));
   }
 
-  function addArrayRow(key, createRow) {
-    setForm((current) => ({
+  function addArrayRow(setter, key, createRow) {
+    setter((current) => ({
       ...current,
       [key]: [...current[key], createRow()],
     }));
   }
 
-  function removeArrayRow(key, index) {
-    setForm((current) => ({
+  function removeArrayRow(setter, key, index) {
+    setter((current) => ({
       ...current,
-      [key]: current[key].length === 1 ? current[key] : current[key].filter((_, rowIndex) => rowIndex !== index),
+      [key]:
+        current[key].length === 1
+          ? current[key]
+          : current[key].filter((_, rowIndex) => rowIndex !== index),
     }));
   }
 
-  async function handleImageUpload(event) {
+  async function handleImageUpload(setter, event) {
     const file = event.target.files?.[0];
     if (!file) {
       return;
@@ -901,8 +1639,9 @@ function AdminPage({ user, onSignIn, onSignOut, onPlantsChanged }) {
 
     try {
       const imageFileDataUrl = await readFileAsDataUrl(file);
-      setForm((current) => ({
+      setter((current) => ({
         ...current,
+        imageUrl: "",
         imageFileDataUrl,
       }));
       setFeedback({ tone: "", message: "" });
@@ -911,6 +1650,51 @@ function AdminPage({ user, onSignIn, onSignOut, onPlantsChanged }) {
         tone: "error",
         message: error instanceof Error ? error.message : "Could not process the image.",
       });
+    }
+  }
+
+  function resetNewForm() {
+    setNewForm(createEmptyAdminForm());
+  }
+
+  function resetEditForm() {
+    setEditForm(createEmptyAdminForm());
+    setEditingPlantId("");
+  }
+
+  function handleSelectPlantForEdit(record) {
+    setEditingPlantId(record.id);
+    setEditForm(mapPlantRecordToForm(record));
+    setFeedback({ tone: "", message: "" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function confirmDeleteExistingPlant() {
+    if (!pendingDeleteRecord) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      await deletePlantRecord(pendingDeleteRecord.id);
+      await onPlantsChanged();
+
+      if (editingPlantId === pendingDeleteRecord.id) {
+        resetEditForm();
+      }
+
+      setFeedback({
+        tone: "success",
+        message: `Deleted ${pendingDeleteRecord.id} from Firestore.`,
+      });
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Could not delete this plant.",
+      });
+    } finally {
+      setPendingDeleteRecord(null);
+      setIsSaving(false);
     }
   }
 
@@ -930,8 +1714,36 @@ function AdminPage({ user, onSignIn, onSignOut, onPlantsChanged }) {
     }
   }
 
-  async function handleManualSave() {
-    const record = buildPlantRecordFromForm(form);
+  async function handleJsonImageUpload(event) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      const imageFileDataUrl = await readFileAsDataUrl(file);
+      setJsonImportMedia((current) => ({
+        ...current,
+        imageFileDataUrl,
+        imageFileName: file.name,
+      }));
+      setFeedback({ tone: "", message: "" });
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Could not process the image.",
+      });
+    }
+  }
+
+  function resetJsonImport() {
+    setJsonText("");
+    setJsonFileName("");
+    setJsonImportMedia(createEmptyJsonImportMedia());
+  }
+
+  async function handleNewSave() {
+    const record = buildPlantRecordFromForm(newForm);
     const errors = validatePlantRecord(record);
 
     if (errors.length) {
@@ -943,7 +1755,7 @@ function AdminPage({ user, onSignIn, onSignOut, onPlantsChanged }) {
       setIsSaving(true);
       await savePlantRecord(record);
       await onPlantsChanged();
-      setForm(createEmptyAdminForm());
+      resetNewForm();
       setFeedback({ tone: "success", message: `Saved ${record.id} to Firestore.` });
     } catch (error) {
       setFeedback({
@@ -955,11 +1767,55 @@ function AdminPage({ user, onSignIn, onSignOut, onPlantsChanged }) {
     }
   }
 
+  async function handleEditSave() {
+    const record = buildPlantRecordFromForm(editForm);
+    const errors = validatePlantRecord(record);
+
+    if (errors.length) {
+      setFeedback({ tone: "error", message: errors[0] });
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      await savePlantRecord(record);
+      await onPlantsChanged();
+      setEditingPlantId(record.id);
+      setEditForm((current) => ({
+        ...current,
+        imageUrl: current.imageFileDataUrl || current.imageUrl,
+        imageFileDataUrl: "",
+      }));
+      setFeedback({ tone: "success", message: `Updated ${record.id} in Firestore.` });
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Could not update this plant.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   async function handleJsonSave() {
     try {
       setIsSaving(true);
       const parsed = JSON.parse(jsonText);
-      const records = (Array.isArray(parsed) ? parsed : [parsed]).map(normalizeImportedPlantRecord);
+      const normalizedRecords = (Array.isArray(parsed) ? parsed : [parsed]).map(
+        normalizeImportedPlantRecord,
+      );
+
+      if (jsonImportMedia.imageFileDataUrl && normalizedRecords.length !== 1) {
+        setFeedback({
+          tone: "error",
+          message: "JSON image upload works only for a single plant record.",
+        });
+        return;
+      }
+
+      const records = jsonImportMedia.imageFileDataUrl
+        ? normalizedRecords.map((record) => applyImportedImage(record, jsonImportMedia))
+        : normalizedRecords;
       const firstError = records
         .map((record) => validatePlantRecord(record))
         .find((errors) => errors.length);
@@ -971,6 +1827,7 @@ function AdminPage({ user, onSignIn, onSignOut, onPlantsChanged }) {
 
       await Promise.all(records.map((record) => savePlantRecord(record)));
       await onPlantsChanged();
+      resetJsonImport();
       setFeedback({
         tone: "success",
         message: `Saved ${records.length} plant record${records.length === 1 ? "" : "s"} from JSON.`,
@@ -1028,15 +1885,36 @@ function AdminPage({ user, onSignIn, onSignOut, onPlantsChanged }) {
     );
   }
 
+  const filteredAdminPlants = plants.filter((plant) => {
+    if (!deferredAdminSearchQuery) {
+      return true;
+    }
+
+    const haystack = [
+      plant.id,
+      plant.scientific_name,
+      plant.common_name?.en,
+      plant.common_name?.ml,
+      plant.family?.en,
+      plant.family?.ml,
+      ...(plant.medicinal_uses?.en ?? []),
+      ...(plant.medicinal_uses?.ml ?? []),
+    ]
+      .map((value) => normalizeText(value))
+      .join(" ");
+
+    return haystack.includes(normalizeText(deferredAdminSearchQuery));
+  });
+
   return (
     <main className="admin-main">
       <section className="content-section admin-page-shell">
         <div className="admin-page-head">
           <div>
             <p className="eyebrow">Admin</p>
-            <h2>Plant data manager</h2>
+            <h2>Admin console</h2>
             <p className="admin-supporting-copy">
-              Add plants manually in English and Malayalam, upload an image, or import JSON that matches your Firestore schema.
+              New plant creation and existing plant editing now live in separate admin sections.
             </p>
           </div>
           <div className="admin-head-actions">
@@ -1047,22 +1925,29 @@ function AdminPage({ user, onSignIn, onSignOut, onPlantsChanged }) {
           </div>
         </div>
 
-        <div className="admin-mode-switch">
+        <nav className="admin-page-nav" aria-label="Admin sections">
           <button
             type="button"
-            className={entryMode === "form" ? "toggle-chip is-active" : "toggle-chip"}
-            onClick={() => setEntryMode("form")}
+            className={adminSection === "home" ? "toggle-chip is-active" : "toggle-chip"}
+            onClick={() => onAdminNavigate("home")}
           >
-            Manual form
+            Overview
           </button>
           <button
             type="button"
-            className={entryMode === "json" ? "toggle-chip is-active" : "toggle-chip"}
-            onClick={() => setEntryMode("json")}
+            className={adminSection === "new" ? "toggle-chip is-active" : "toggle-chip"}
+            onClick={() => onAdminNavigate("new")}
           >
-            JSON upload
+            Add new plant
           </button>
-        </div>
+          <button
+            type="button"
+            className={adminSection === "edit" ? "toggle-chip is-active" : "toggle-chip"}
+            onClick={() => onAdminNavigate("edit")}
+          >
+            Edit existing
+          </button>
+        </nav>
 
         {feedback.message ? (
           <div
@@ -1074,477 +1959,337 @@ function AdminPage({ user, onSignIn, onSignOut, onPlantsChanged }) {
           </div>
         ) : null}
 
-        {entryMode === "form" ? (
-          <div className="admin-panel-grid">
+        {adminSection === "home" ? (
+          <div className="admin-hub-grid">
+            <button
+              type="button"
+              className="admin-entry-card"
+              onClick={() => onAdminNavigate("new")}
+            >
+              <span className="admin-entry-kicker">Create</span>
+              <strong>Add new plant</strong>
+              <p>Create a new record manually or import new plant records from JSON.</p>
+              <span className="admin-entry-meta">Images stay inside each plant record form</span>
+            </button>
+            <button
+              type="button"
+              className="admin-entry-card"
+              onClick={() => onAdminNavigate("edit")}
+            >
+              <span className="admin-entry-kicker">Manage</span>
+              <strong>Edit existing plant</strong>
+              <p>Search Firestore records, open one record, update it, or delete it.</p>
+              <span className="admin-entry-meta">{plants.length} plants in Firestore</span>
+            </button>
+          </div>
+        ) : null}
+
+        {adminSection === "new" ? (
+          <>
+            <div className="admin-mode-switch">
+              <button
+                type="button"
+                className={newEntryMode === "json" ? "toggle-chip is-active" : "toggle-chip"}
+                onClick={() => setNewEntryMode("json")}
+              >
+                JSON upload
+              </button>
+              <button
+                type="button"
+                className={newEntryMode === "form" ? "toggle-chip is-active" : "toggle-chip"}
+                onClick={() => setNewEntryMode("form")}
+              >
+                Manual form
+              </button>
+            </div>
+
+            {newEntryMode === "form" ? (
+              <AdminPlantForm
+                title="Add new plant"
+                description="Create a brand new plant record. Image upload belongs to this record form."
+                form={newForm}
+                onFieldChange={(key, value) => updateFormField(setNewForm, key, value)}
+                onArrayRowChange={(key, index, field, value) =>
+                  updateArrayRow(setNewForm, key, index, field, value)
+                }
+                onAddArrayRow={(key, createRow) => addArrayRow(setNewForm, key, createRow)}
+                onRemoveArrayRow={(key, index) => removeArrayRow(setNewForm, key, index)}
+                onImageUpload={(event) => void handleImageUpload(setNewForm, event)}
+                onSave={handleNewSave}
+                onReset={resetNewForm}
+                saveLabel="Save plant"
+                resetLabel="Clear form"
+                isSaving={isSaving}
+              />
+            ) : (
+              <section className="admin-panel">
+                <div className="admin-section-head">
+                  <div>
+                    <h3>Upload JSON</h3>
+                    <p className="admin-section-copy">
+                      Import one plant record or a JSON array that matches the Firestore schema.
+                    </p>
+                  </div>
+                </div>
+                <div className="admin-json-import-grid">
+                  <label className="admin-field">
+                    <span>JSON file</span>
+                    <input type="file" accept=".json,application/json" onChange={handleJsonFileUpload} />
+                  </label>
+                  {jsonFileName ? <p className="admin-file-caption">Loaded: {jsonFileName}</p> : null}
+                  <label className="admin-field">
+                    <span>JSON content</span>
+                    <textarea
+                      rows="18"
+                      value={jsonText}
+                      onChange={(event) => setJsonText(event.target.value)}
+                      placeholder='Paste one plant object or an array of plant objects that match your Firestore schema.'
+                    />
+                  </label>
+
+                  <section className="admin-json-media-card">
+                    <div className="admin-json-media-head">
+                      <div>
+                        <strong>Optional image for JSON import</strong>
+                        <p className="admin-section-copy">
+                          Use this only when importing a single plant record.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="admin-form-grid two-column">
+                      <label className="admin-field">
+                        <span>Plant image</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(event) => void handleJsonImageUpload(event)}
+                        />
+                      </label>
+                      <div className="admin-json-media-meta">
+                        {jsonImportMedia.imageFileName ? (
+                          <p className="admin-file-caption">
+                            Image loaded: {jsonImportMedia.imageFileName}
+                          </p>
+                        ) : (
+                          <p className="admin-file-caption">
+                            No image selected yet.
+                          </p>
+                        )}
+                      </div>
+                      <label className="admin-field">
+                        <span>Image alt (English)</span>
+                        <input
+                          type="text"
+                          value={jsonImportMedia.imageAltEn}
+                          onChange={(event) =>
+                            setJsonImportMedia((current) => ({
+                              ...current,
+                              imageAltEn: event.target.value,
+                            }))
+                          }
+                          placeholder="Plant image description in English"
+                        />
+                      </label>
+                      <label className="admin-field">
+                        <span>Image alt (Malayalam)</span>
+                        <input
+                          type="text"
+                          value={jsonImportMedia.imageAltMl}
+                          onChange={(event) =>
+                            setJsonImportMedia((current) => ({
+                              ...current,
+                              imageAltMl: event.target.value,
+                            }))
+                          }
+                          placeholder="ചിത്രത്തിന്റെ വിവരണം മലയാളത്തിൽ"
+                        />
+                      </label>
+                    </div>
+                    {jsonImportMedia.imageFileDataUrl ? (
+                      <div className="admin-image-preview">
+                        <img src={jsonImportMedia.imageFileDataUrl} alt="JSON import preview" />
+                      </div>
+                    ) : null}
+                  </section>
+                </div>
+                <div className="admin-submit-row admin-json-submit-row">
+                  <button
+                    type="button"
+                    className="admin-primary-button"
+                    onClick={() => void handleJsonSave()}
+                    disabled={isSaving || !jsonText.trim()}
+                  >
+                    {isSaving ? "Importing..." : "Import JSON"}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={resetJsonImport}
+                    disabled={isSaving}
+                  >
+                    Clear import
+                  </button>
+                </div>
+              </section>
+            )}
+          </>
+        ) : null}
+
+        {adminSection === "edit" ? (
+          <>
             <section className="admin-panel">
               <div className="admin-section-head">
-                <h3>Core identity</h3>
+                <div>
+                  <h3>Existing plants</h3>
+                  <p className="admin-section-copy">
+                    Search records, select one to edit, or delete it.
+                  </p>
+                </div>
               </div>
-              <div className="admin-form-grid">
+              <div className="admin-existing-toolbar">
                 <label className="admin-field">
-                  <span>Plant ID</span>
+                  <span>Search plants</span>
                   <input
-                    type="text"
-                    value={form.id}
-                    onChange={(event) => updateFormField("id", event.target.value)}
-                    placeholder="sesbania-grandiflora"
+                    type="search"
+                    value={adminSearchQuery}
+                    onChange={(event) => setAdminSearchQuery(event.target.value)}
+                    placeholder="Search by plant name, scientific name, family, or use"
                   />
                 </label>
-                <label className="admin-field">
-                  <span>Scientific name</span>
-                  <input
-                    type="text"
-                    value={form.scientificName}
-                    onChange={(event) => updateFormField("scientificName", event.target.value)}
-                    placeholder="Sesbania grandiflora"
-                  />
-                </label>
-                <label className="admin-field">
-                  <span>Icon</span>
-                  <input
-                    type="text"
-                    value={form.icon}
-                    onChange={(event) => updateFormField("icon", event.target.value)}
-                    placeholder="🌿"
-                  />
-                </label>
+                <div className="admin-toolbar-actions">
+                  <div className="admin-results-count">
+                    {filteredAdminPlants.length} plant{filteredAdminPlants.length === 1 ? "" : "s"}
+                  </div>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={resetEditForm}
+                    disabled={isSaving}
+                  >
+                    Clear selection
+                  </button>
+                </div>
+              </div>
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Plant</th>
+                      <th>Scientific name</th>
+                      <th>Family</th>
+                      <th>Image</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAdminPlants.map((plant) => (
+                      <tr key={plant.id} className={editingPlantId === plant.id ? "is-active" : ""}>
+                        <td>
+                          <div className="admin-table-plant">
+                            {plant.image?.src ? (
+                              <img src={plant.image.src} alt={plant.image?.alt?.en || getPlantDisplayName(plant)} />
+                            ) : (
+                              <span className="admin-table-placeholder">+</span>
+                            )}
+                            <div>
+                              <strong>{getPlantDisplayName(plant)}</strong>
+                              <span>{plant.common_name?.ml || plant.id}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td>{plant.scientific_name}</td>
+                        <td>{plant.family?.en || "-"}</td>
+                        <td>
+                          <span className={plant.image?.src ? "admin-status-chip is-ready" : "admin-status-chip"}>
+                            {plant.image?.src ? "Added" : "Missing"}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="admin-plant-actions">
+                            <button
+                              type="button"
+                              className="ghost-button"
+                              onClick={() => handleSelectPlantForEdit(plant)}
+                              disabled={isSaving}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="ghost-button admin-danger-button"
+                              onClick={() => setPendingDeleteRecord(plant)}
+                              disabled={isSaving}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!filteredAdminPlants.length ? (
+                  <div className="admin-empty-results">No plants match this search.</div>
+                ) : null}
               </div>
             </section>
 
-            <section className="admin-panel">
-              <div className="admin-section-head">
-                <h3>Bilingual names</h3>
-              </div>
-              <div className="admin-form-grid two-column">
-                <label className="admin-field">
-                  <span>Common name (English)</span>
-                  <input
-                    type="text"
-                    value={form.commonNameEn}
-                    onChange={(event) => updateFormField("commonNameEn", event.target.value)}
-                  />
-                </label>
-                <label className="admin-field">
-                  <span>Common name (Malayalam)</span>
-                  <input
-                    type="text"
-                    value={form.commonNameMl}
-                    onChange={(event) => updateFormField("commonNameMl", event.target.value)}
-                  />
-                </label>
-                <label className="admin-field">
-                  <span>Family (English)</span>
-                  <input
-                    type="text"
-                    value={form.familyEn}
-                    onChange={(event) => updateFormField("familyEn", event.target.value)}
-                  />
-                </label>
-                <label className="admin-field">
-                  <span>Family (Malayalam)</span>
-                  <input
-                    type="text"
-                    value={form.familyMl}
-                    onChange={(event) => updateFormField("familyMl", event.target.value)}
-                  />
-                </label>
-              </div>
-            </section>
-
-            <section className="admin-panel">
-              <div className="admin-section-head">
-                <h3>Overview and uses</h3>
-              </div>
-              <div className="admin-form-grid two-column">
-                <label className="admin-field">
-                  <span>Overview (English)</span>
-                  <textarea
-                    rows="5"
-                    value={form.overviewEn}
-                    onChange={(event) => updateFormField("overviewEn", event.target.value)}
-                  />
-                </label>
-                <label className="admin-field">
-                  <span>Overview (Malayalam)</span>
-                  <textarea
-                    rows="5"
-                    value={form.overviewMl}
-                    onChange={(event) => updateFormField("overviewMl", event.target.value)}
-                  />
-                </label>
-                <label className="admin-field">
-                  <span>Medicinal uses (English)</span>
-                  <textarea
-                    rows="5"
-                    value={form.medicinalUsesEn}
-                    onChange={(event) => updateFormField("medicinalUsesEn", event.target.value)}
-                    placeholder="One per line or comma separated"
-                  />
-                </label>
-                <label className="admin-field">
-                  <span>Medicinal uses (Malayalam)</span>
-                  <textarea
-                    rows="5"
-                    value={form.medicinalUsesMl}
-                    onChange={(event) => updateFormField("medicinalUsesMl", event.target.value)}
-                    placeholder="One per line or comma separated"
-                  />
-                </label>
-              </div>
-            </section>
-
-            <section className="admin-panel">
-              <div className="admin-section-head">
-                <h3>Plant details</h3>
-              </div>
-              <div className="admin-form-grid two-column">
-                <label className="admin-field">
-                  <span>Plant characteristics (English)</span>
-                  <textarea
-                    rows="5"
-                    value={form.characteristicsEn}
-                    onChange={(event) => updateFormField("characteristicsEn", event.target.value)}
-                  />
-                </label>
-                <label className="admin-field">
-                  <span>Plant characteristics (Malayalam)</span>
-                  <textarea
-                    rows="5"
-                    value={form.characteristicsMl}
-                    onChange={(event) => updateFormField("characteristicsMl", event.target.value)}
-                  />
-                </label>
-                <label className="admin-field">
-                  <span>Habitat (English)</span>
-                  <textarea
-                    rows="4"
-                    value={form.habitatEn}
-                    onChange={(event) => updateFormField("habitatEn", event.target.value)}
-                  />
-                </label>
-                <label className="admin-field">
-                  <span>Habitat (Malayalam)</span>
-                  <textarea
-                    rows="4"
-                    value={form.habitatMl}
-                    onChange={(event) => updateFormField("habitatMl", event.target.value)}
-                  />
-                </label>
-                <label className="admin-field">
-                  <span>Medicinal properties (English)</span>
-                  <textarea
-                    rows="5"
-                    value={form.medicinalPropertiesEn}
-                    onChange={(event) => updateFormField("medicinalPropertiesEn", event.target.value)}
-                  />
-                </label>
-                <label className="admin-field">
-                  <span>Medicinal properties (Malayalam)</span>
-                  <textarea
-                    rows="5"
-                    value={form.medicinalPropertiesMl}
-                    onChange={(event) => updateFormField("medicinalPropertiesMl", event.target.value)}
-                  />
-                </label>
-              </div>
-            </section>
-
-            <section className="admin-panel">
-              <div className="admin-section-head">
-                <h3>Image</h3>
-              </div>
-              <div className="admin-form-grid">
-                <label className="admin-field">
-                  <span>Image URL</span>
-                  <input
-                    type="url"
-                    value={form.imageUrl}
-                    onChange={(event) => updateFormField("imageUrl", event.target.value)}
-                    placeholder="https://..."
-                  />
-                </label>
-                <label className="admin-field">
-                  <span>Upload image</span>
-                  <input type="file" accept="image/*" onChange={handleImageUpload} />
-                </label>
-                <label className="admin-field">
-                  <span>Image alt (English)</span>
-                  <input
-                    type="text"
-                    value={form.imageAltEn}
-                    onChange={(event) => updateFormField("imageAltEn", event.target.value)}
-                  />
-                </label>
-                <label className="admin-field">
-                  <span>Image alt (Malayalam)</span>
-                  <input
-                    type="text"
-                    value={form.imageAltMl}
-                    onChange={(event) => updateFormField("imageAltMl", event.target.value)}
-                  />
-                </label>
-              </div>
-              {form.imageFileDataUrl || form.imageUrl ? (
-                <div className="admin-image-preview">
-                  <img
-                    src={form.imageFileDataUrl || form.imageUrl}
-                    alt={form.imageAltEn || form.commonNameEn || "Plant preview"}
+            {editingPlantId ? (
+              <div className="admin-modal-backdrop" onClick={resetEditForm}>
+                <div
+                  className="admin-modal"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Edit existing plant"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="admin-modal-head">
+                    <div>
+                      <h3>Edit existing plant</h3>
+                      <p className="admin-section-copy">Editing Firestore record: {editingPlantId}</p>
+                    </div>
+                    <button type="button" className="ghost-button" onClick={resetEditForm}>
+                      Close
+                    </button>
+                  </div>
+                  <AdminPlantForm
+                    title="Plant record"
+                    description=""
+                    form={editForm}
+                    onFieldChange={(key, value) => updateFormField(setEditForm, key, value)}
+                    onArrayRowChange={(key, index, field, value) =>
+                      updateArrayRow(setEditForm, key, index, field, value)
+                    }
+                    onAddArrayRow={(key, createRow) => addArrayRow(setEditForm, key, createRow)}
+                    onRemoveArrayRow={(key, index) => removeArrayRow(setEditForm, key, index)}
+                    onImageUpload={(event) => void handleImageUpload(setEditForm, event)}
+                    onSave={handleEditSave}
+                    onReset={resetEditForm}
+                    saveLabel="Update plant"
+                    resetLabel="Cancel edit"
+                    isSaving={isSaving}
+                    lockId
                   />
                 </div>
-              ) : null}
-            </section>
-
-            <section className="admin-panel">
-              <div className="admin-section-head">
-                <h3>Other names</h3>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  onClick={() => addArrayRow("aliases", createEmptyAliasRow)}
-                >
-                  Add row
-                </button>
               </div>
-              <div className="admin-repeat-grid">
-                {form.aliases.map((row, index) => (
-                  <div className="admin-repeat-card" key={`alias-${index}`}>
-                    <div className="admin-form-grid three-column">
-                      <label className="admin-field">
-                        <span>Category</span>
-                        <input
-                          type="text"
-                          value={row.category}
-                          onChange={(event) =>
-                            updateArrayRow("aliases", index, "category", event.target.value)
-                          }
-                        />
-                      </label>
-                      <label className="admin-field">
-                        <span>English names</span>
-                        <input
-                          type="text"
-                          value={row.en}
-                          onChange={(event) =>
-                            updateArrayRow("aliases", index, "en", event.target.value)
-                          }
-                          placeholder="Comma separated"
-                        />
-                      </label>
-                      <label className="admin-field">
-                        <span>Malayalam names</span>
-                        <input
-                          type="text"
-                          value={row.ml}
-                          onChange={(event) =>
-                            updateArrayRow("aliases", index, "ml", event.target.value)
-                          }
-                          placeholder="Comma separated"
-                        />
-                      </label>
-                    </div>
-                    <button
-                      type="button"
-                      className="ghost-button admin-remove-button"
-                      onClick={() => removeArrayRow("aliases", index)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="admin-panel">
-              <div className="admin-section-head">
-                <h3>Chemical constituents</h3>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  onClick={() => addArrayRow("constituents", createEmptyConstituentRow)}
-                >
-                  Add row
-                </button>
-              </div>
-              <div className="admin-repeat-grid">
-                {form.constituents.map((row, index) => (
-                  <div className="admin-repeat-card" key={`constituent-${index}`}>
-                    <div className="admin-form-grid two-column">
-                      <label className="admin-field">
-                        <span>Part (English)</span>
-                        <input
-                          type="text"
-                          value={row.partEn}
-                          onChange={(event) =>
-                            updateArrayRow("constituents", index, "partEn", event.target.value)
-                          }
-                        />
-                      </label>
-                      <label className="admin-field">
-                        <span>Description (English)</span>
-                        <textarea
-                          rows="3"
-                          value={row.descriptionEn}
-                          onChange={(event) =>
-                            updateArrayRow(
-                              "constituents",
-                              index,
-                              "descriptionEn",
-                              event.target.value,
-                            )
-                          }
-                        />
-                      </label>
-                      <label className="admin-field">
-                        <span>Part (Malayalam)</span>
-                        <input
-                          type="text"
-                          value={row.partMl}
-                          onChange={(event) =>
-                            updateArrayRow("constituents", index, "partMl", event.target.value)
-                          }
-                        />
-                      </label>
-                      <label className="admin-field">
-                        <span>Description (Malayalam)</span>
-                        <textarea
-                          rows="3"
-                          value={row.descriptionMl}
-                          onChange={(event) =>
-                            updateArrayRow(
-                              "constituents",
-                              index,
-                              "descriptionMl",
-                              event.target.value,
-                            )
-                          }
-                        />
-                      </label>
-                    </div>
-                    <button
-                      type="button"
-                      className="ghost-button admin-remove-button"
-                      onClick={() => removeArrayRow("constituents", index)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="admin-panel">
-              <div className="admin-section-head">
-                <h3>Treatments</h3>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  onClick={() => addArrayRow("treatments", createEmptyTreatmentRow)}
-                >
-                  Add row
-                </button>
-              </div>
-              <div className="admin-repeat-grid">
-                {form.treatments.map((row, index) => (
-                  <div className="admin-repeat-card" key={`treatment-${index}`}>
-                    <div className="admin-form-grid two-column">
-                      <label className="admin-field">
-                        <span>Condition (English)</span>
-                        <input
-                          type="text"
-                          value={row.conditionEn}
-                          onChange={(event) =>
-                            updateArrayRow("treatments", index, "conditionEn", event.target.value)
-                          }
-                        />
-                      </label>
-                      <label className="admin-field">
-                        <span>Condition (Malayalam)</span>
-                        <input
-                          type="text"
-                          value={row.conditionMl}
-                          onChange={(event) =>
-                            updateArrayRow("treatments", index, "conditionMl", event.target.value)
-                          }
-                        />
-                      </label>
-                      <label className="admin-field">
-                        <span>Remedy (English)</span>
-                        <textarea
-                          rows="3"
-                          value={row.remedyEn}
-                          onChange={(event) =>
-                            updateArrayRow("treatments", index, "remedyEn", event.target.value)
-                          }
-                        />
-                      </label>
-                      <label className="admin-field">
-                        <span>Remedy (Malayalam)</span>
-                        <textarea
-                          rows="3"
-                          value={row.remedyMl}
-                          onChange={(event) =>
-                            updateArrayRow("treatments", index, "remedyMl", event.target.value)
-                          }
-                        />
-                      </label>
-                    </div>
-                    <button
-                      type="button"
-                      className="ghost-button admin-remove-button"
-                      onClick={() => removeArrayRow("treatments", index)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <div className="admin-submit-row">
-              <button
-                type="button"
-                className="admin-primary-button"
-                onClick={() => void handleManualSave()}
-                disabled={isSaving}
-              >
-                {isSaving ? "Saving..." : "Save plant"}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <section className="admin-panel">
-            <div className="admin-section-head">
-              <h3>Upload JSON</h3>
-            </div>
-            <div className="admin-form-grid">
-              <label className="admin-field">
-                <span>JSON file</span>
-                <input type="file" accept=".json,application/json" onChange={handleJsonFileUpload} />
-              </label>
-              {jsonFileName ? <p className="admin-file-caption">Loaded: {jsonFileName}</p> : null}
-              <label className="admin-field">
-                <span>JSON content</span>
-                <textarea
-                  rows="18"
-                  value={jsonText}
-                  onChange={(event) => setJsonText(event.target.value)}
-                  placeholder='Paste one plant object or an array of plant objects that match your Firestore schema.'
-                />
-              </label>
-            </div>
-            <div className="admin-submit-row">
-              <button
-                type="button"
-                className="admin-primary-button"
-                onClick={() => void handleJsonSave()}
-                disabled={isSaving || !jsonText.trim()}
-              >
-                {isSaving ? "Importing..." : "Import JSON"}
-              </button>
-            </div>
-          </section>
-        )}
+            ) : null}
+          </>
+        ) : null}
       </section>
+      <ConfirmDialog
+        isOpen={Boolean(pendingDeleteRecord)}
+        title={confirmCopy.deleteTitle}
+        description={
+          pendingDeleteRecord
+            ? `${confirmCopy.deleteDescription} ${getPlantDisplayName(pendingDeleteRecord)}`
+            : ""
+        }
+        confirmLabel={confirmCopy.deleteAction}
+        cancelLabel={confirmCopy.cancel}
+        onConfirm={confirmDeleteExistingPlant}
+        onCancel={() => setPendingDeleteRecord(null)}
+        isDestructive
+      />
     </main>
   );
 }
@@ -1587,6 +2332,7 @@ function SavedPage({ copy, language, plants, favoritePlantIds, user, onOpenPlant
       ...plant.aliases,
       ...plant.uses,
       ...plant.symptoms,
+      ...plant.remedies,
     ].some((value) => normalizeText(value).includes(query));
   });
 
@@ -1629,6 +2375,10 @@ function SavedPage({ copy, language, plants, favoritePlantIds, user, onOpenPlant
               {filteredSavedPlants.length ? (
                 <div className="results-stack">
                   {filteredSavedPlants.map((localizedPlant) => {
+                    const previewChips = Array.from(
+                      new Set([...localizedPlant.symptoms, ...localizedPlant.uses]),
+                    ).slice(0, 3);
+
                     return (
                       <button
                         type="button"
@@ -1638,14 +2388,14 @@ function SavedPage({ copy, language, plants, favoritePlantIds, user, onOpenPlant
                       >
                         <div className="result-card-head">
                           <span className="result-visual">
-                            {localizedPlant.image.src ? (
+                        {localizedPlant.image.src ? (
                               <img
                                 className="result-image"
                                 src={localizedPlant.image.src}
                                 alt={localizedPlant.image.alt}
                               />
                             ) : (
-                              <span className="result-icon">{localizedPlant.icon}</span>
+                              <span className="result-placeholder" aria-hidden="true" />
                             )}
                           </span>
                           <div className="result-title-block">
@@ -1656,6 +2406,15 @@ function SavedPage({ copy, language, plants, favoritePlantIds, user, onOpenPlant
                         </div>
 
                         <p className="result-teaser">{localizedPlant.teaser}</p>
+                        {previewChips.length ? (
+                          <div className="result-chip-row">
+                            {previewChips.map((chip) => (
+                              <span className="result-chip" key={chip}>
+                                {chip}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
                       </button>
                     );
                   })}
@@ -1679,7 +2438,7 @@ function SavedPage({ copy, language, plants, favoritePlantIds, user, onOpenPlant
   );
 }
 
-function MePage({ copy, user, favoriteCount, onSignIn, onSignOut }) {
+function MePage({ copy, user, favoriteCount, language, onLanguageChange, onSignIn, onSignOut }) {
   return (
     <section className="plants-page">
       <div className="content-section">
@@ -1706,17 +2465,40 @@ function MePage({ copy, user, favoriteCount, onSignIn, onSignOut }) {
                   <span>{copy.me.favoritesLabel}</span>
                   <strong>{favoriteCount}</strong>
                 </div>
-                <button
-                  type="button"
-                  className="ghost-button auth-action-button account-signout-button"
-                  onClick={onSignOut}
+              </div>
+              <div className="account-preference-card">
+                <div className="account-preference-copy">
+                  <strong>{copy.me.languageLabel}</strong>
+                  <p>{copy.me.languageNote}</p>
+                </div>
+                <div
+                  className="account-language-toggle"
+                  role="tablist"
+                  aria-label={copy.me.languageLabel}
                 >
-                  {copy.me.signOut}
-                </button>
+                  {Object.entries(copy.me.languageChoices).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={value === language ? "toggle-chip is-active" : "toggle-chip"}
+                      onClick={() => onLanguageChange(value)}
+                      aria-pressed={value === language}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="account-note-card">
                 <p className="account-note">{copy.me.note}</p>
               </div>
+              <button
+                type="button"
+                className="ghost-button auth-action-button account-signout-button is-destructive"
+                onClick={onSignOut}
+              >
+                {copy.me.signOut}
+              </button>
             </div>
           ) : (
             <AuthPrompt
@@ -1950,9 +2732,7 @@ function Hero({ copy, language, plants, onSearchSubmit, onPlantOpen }) {
                 onPlantOpen({ query: mostPopularPlant.name, slug: mostPopularPlant.slug })
               }
             >
-              <strong className="hero-highlight-title">
-                {mostPopularPlant.icon} {mostPopularPlant.name}
-              </strong>
+              <strong className="hero-highlight-title">{mostPopularPlant.name}</strong>
               <span className="hero-highlight-subtitle">{mostPopularPlant.scientific}</span>
               <p className="hero-highlight-description">
                 {mostPopularPlant.summary || mostPopularPlant.teaser || copy.featured.description}
@@ -1971,9 +2751,6 @@ function Hero({ copy, language, plants, onSearchSubmit, onPlantOpen }) {
                       className="hero-saved-pill"
                       onClick={() => onPlantOpen({ query: plant.name, slug: plant.slug })}
                     >
-                      <span className="hero-saved-pill-icon" aria-hidden="true">
-                        {plant.icon}
-                      </span>
                       <span className="hero-saved-pill-text">{plant.name}</span>
                     </button>
                   ))}
@@ -2086,15 +2863,30 @@ function PlantsPage({
   selectedPlantSlug,
   searchSeed,
   onSelectPlant,
+  detailEntrySource,
+  onReturnToSource,
+  onDetailStateChange,
 }) {
+  const DETAIL_SWIPE_EDGE = 32;
+  const DETAIL_SWIPE_CLOSE_THRESHOLD = 88;
   const localizedPlants = plants.map((plant) => localizePlant(plant, language));
   const [searchQuery, setSearchQuery] = useState(searchSeed.query);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
+  const [imageZoomLevel, setImageZoomLevel] = useState(1);
   const [shareState, setShareState] = useState("idle");
+  const [visibleResultCount, setVisibleResultCount] = useState(SEARCH_RESULTS_BATCH_SIZE);
+  const [detailSwipeOffset, setDetailSwipeOffset] = useState(0);
   const [shouldAutoOpenDetail, setShouldAutoOpenDetail] = useState(
     Boolean(searchSeed.openDetail && selectedPlantSlug),
   );
+  const detailSwipeStateRef = useRef({
+    startX: 0,
+    startY: 0,
+    active: false,
+    tracking: false,
+  });
   const trimmedSearchQuery = searchQuery.trim();
   const deferredQuery = useDeferredValue(trimmedSearchQuery);
   const quickSymptoms = getTopTerms(localizedPlants, "symptoms", 5);
@@ -2105,16 +2897,37 @@ function PlantsPage({
     setShouldAutoOpenDetail(Boolean(searchSeed.openDetail && selectedPlantSlug));
     setIsDetailOpen(Boolean(searchSeed.openDetail && selectedPlantSlug));
     setIsMobileSearchOpen(false);
+    setIsImageViewerOpen(false);
+    setImageZoomLevel(1);
     setShareState("idle");
-  }, [searchSeed, selectedPlantSlug]);
+  }, [searchSeed]);
 
   useEffect(() => {
-    document.body.classList.toggle("detail-open", isDetailOpen || isMobileSearchOpen);
+    document.body.classList.toggle(
+      "detail-open",
+      isDetailOpen || isMobileSearchOpen || isImageViewerOpen,
+    );
 
     return () => {
       document.body.classList.remove("detail-open");
     };
-  }, [isDetailOpen, isMobileSearchOpen]);
+  }, [isDetailOpen, isImageViewerOpen, isMobileSearchOpen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !isImageViewerOpen) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setIsImageViewerOpen(false);
+        setImageZoomLevel(1);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isImageViewerOpen]);
 
   useEffect(() => {
     if (shareState === "idle") {
@@ -2130,6 +2943,16 @@ function PlantsPage({
     };
   }, [shareState]);
 
+  useEffect(() => {
+    if (!isDetailOpen && detailSwipeOffset !== 0) {
+      setDetailSwipeOffset(0);
+    }
+  }, [detailSwipeOffset, isDetailOpen]);
+
+  useEffect(() => {
+    setVisibleResultCount(SEARCH_RESULTS_BATCH_SIZE);
+  }, [deferredQuery]);
+
   const searchResults = localizedPlants
     .map((plant) => getSearchResult(plant, normalizeText(deferredQuery)))
     .filter(Boolean)
@@ -2140,28 +2963,56 @@ function PlantsPage({
 
       return left.plant.name.localeCompare(right.plant.name);
     });
+  const visibleSearchResults = searchResults.slice(0, visibleResultCount);
+  const hasMoreSearchResults = searchResults.length > visibleResultCount;
 
   useEffect(() => {
     if (!searchResults.length) {
       if (!shouldAutoOpenDetail) {
         setIsDetailOpen(false);
       }
+      onDetailStateChange(false);
+      onSelectPlant(null);
       return;
     }
 
-    const hasSelectedPlant = searchResults.some(
-      (result) => result.plant.slug === selectedPlantSlug,
-    );
-
-    if (!hasSelectedPlant) {
-      onSelectPlant(searchResults[0].plant.slug);
-    }
+    const hasSelectedPlant = selectedPlantSlug
+      ? searchResults.some(
+          (result) => result.plant.slug === selectedPlantSlug,
+        )
+      : false;
 
     if (shouldAutoOpenDetail) {
+      if (!hasSelectedPlant) {
+        onSelectPlant(searchResults[0].plant.slug);
+      }
+
       setIsDetailOpen(true);
+      onDetailStateChange(true);
       setShouldAutoOpenDetail(false);
+      return;
     }
-  }, [onSelectPlant, searchResults, selectedPlantSlug, shouldAutoOpenDetail]);
+
+    if (!trimmedSearchQuery) {
+      if (!hasSelectedPlant) {
+        onSelectPlant(searchResults[0].plant.slug);
+      }
+      return;
+    }
+
+    if (!hasSelectedPlant && selectedPlantSlug) {
+      onSelectPlant(null);
+      setIsDetailOpen(false);
+      onDetailStateChange(false);
+    }
+  }, [
+    onDetailStateChange,
+    onSelectPlant,
+    searchResults,
+    selectedPlantSlug,
+    shouldAutoOpenDetail,
+    trimmedSearchQuery,
+  ]);
 
   const selectedResult =
     searchResults.find((result) => result.plant.slug === selectedPlantSlug) ?? null;
@@ -2170,26 +3021,73 @@ function PlantsPage({
   const isSelectedSaved = selectedResult
     ? favoritePlantIds.includes(selectedResult.plant.slug)
     : false;
+  const imageViewerLabels =
+    language === "ml"
+      ? {
+          close: "അടയ്ക്കുക",
+          zoomIn: "വലുതാക്കുക",
+          zoomOut: "ചെറുതാക്കുക",
+          open: "ചിത്രം തുറക്കുക",
+        }
+      : {
+          close: "Close",
+          zoomIn: "Zoom in",
+          zoomOut: "Zoom out",
+          open: "Open image",
+        };
   function clearFilters() {
     setSearchQuery("");
     setIsDetailOpen(false);
+    onDetailStateChange(false);
     setIsMobileSearchOpen(false);
+    setIsImageViewerOpen(false);
+    setImageZoomLevel(1);
     setShouldAutoOpenDetail(false);
   }
 
   function handleSelectResult(slug) {
     onSelectPlant(slug);
     setIsDetailOpen(true);
+    onDetailStateChange(true);
     setShouldAutoOpenDetail(false);
+  }
+
+  function handleCloseDetail() {
+    setDetailSwipeOffset(0);
+    setIsDetailOpen(false);
+    onDetailStateChange(false);
+
+    if (detailEntrySource === "saved") {
+      onReturnToSource();
+    }
   }
 
   function closeMobileSearch() {
     setIsMobileSearchOpen(false);
   }
 
+  function openImageViewer() {
+    setIsImageViewerOpen(true);
+    setImageZoomLevel(1);
+  }
+
+  function closeImageViewer() {
+    setIsImageViewerOpen(false);
+    setImageZoomLevel(1);
+  }
+
+  function handleZoomIn() {
+    setImageZoomLevel((current) => Math.min(current + 0.5, 3));
+  }
+
+  function handleZoomOut() {
+    setImageZoomLevel((current) => Math.max(current - 0.5, 1));
+  }
+
   function handleQuickFilter(term) {
     setSearchQuery(term);
     setIsDetailOpen(false);
+    onDetailStateChange(false);
     setShouldAutoOpenDetail(false);
     closeMobileSearch();
   }
@@ -2228,6 +3126,73 @@ function PlantsPage({
     } catch {
       setShareState("idle");
     }
+  }
+
+  function handleDetailTouchStart(event) {
+    if (!isDetailOpen || isImageViewerOpen || isMobileSearchOpen) {
+      return;
+    }
+
+    const touch = event.touches?.[0];
+    if (!touch) {
+      return;
+    }
+
+    const shouldTrack = touch.clientX <= DETAIL_SWIPE_EDGE;
+    detailSwipeStateRef.current = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      active: shouldTrack,
+      tracking: shouldTrack,
+    };
+
+    if (!shouldTrack && detailSwipeOffset !== 0) {
+      setDetailSwipeOffset(0);
+    }
+  }
+
+  function handleDetailTouchMove(event) {
+    const touch = event.touches?.[0];
+    const swipeState = detailSwipeStateRef.current;
+
+    if (!touch || !swipeState.active || !swipeState.tracking) {
+      return;
+    }
+
+    const deltaX = touch.clientX - swipeState.startX;
+    const deltaY = touch.clientY - swipeState.startY;
+
+    if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 10) {
+      swipeState.tracking = false;
+      setDetailSwipeOffset(0);
+      return;
+    }
+
+    if (deltaX <= 0) {
+      setDetailSwipeOffset(0);
+      return;
+    }
+
+    setDetailSwipeOffset(Math.min(deltaX, 160));
+  }
+
+  function handleDetailTouchEnd() {
+    const swipeState = detailSwipeStateRef.current;
+    const shouldClose = swipeState.active && detailSwipeOffset >= DETAIL_SWIPE_CLOSE_THRESHOLD;
+
+    detailSwipeStateRef.current = {
+      startX: 0,
+      startY: 0,
+      active: false,
+      tracking: false,
+    };
+
+    if (shouldClose) {
+      handleCloseDetail();
+      return;
+    }
+
+    setDetailSwipeOffset(0);
   }
 
   return (
@@ -2338,15 +3303,16 @@ function PlantsPage({
                 <p>{copy.library.noCatalogDescription}</p>
               </div>
             ) : searchResults.length ? (
-                <div className="results-stack">
-                {searchResults.map((result) => (
+              <>
+                <div className="results-stack catalog-results-stack">
+                {visibleSearchResults.map((result) => (
                   <button
                     type="button"
                     key={result.plant.slug}
                     className={
                       result.plant.slug === selectedPlantSlug
-                        ? "result-card is-active"
-                        : "result-card"
+                        ? "result-card catalog-result-card is-active"
+                        : "result-card catalog-result-card"
                     }
                     onClick={() => handleSelectResult(result.plant.slug)}
                   >
@@ -2359,20 +3325,32 @@ function PlantsPage({
                             alt={result.plant.image.alt}
                           />
                         ) : (
-                          <span className="result-icon">{result.plant.icon}</span>
+                          <span className="result-placeholder" aria-hidden="true" />
                         )}
                       </span>
                       <div className="result-title-block">
                         <strong>{result.plant.name}</strong>
                         <small>{result.plant.scientific}</small>
                       </div>
-                      <span className="result-cta">{copy.library.openLabel}</span>
+                      <span className="result-cta" aria-hidden="true">
+                        <svg
+                          className="result-cta-icon"
+                          viewBox="0 0 12 20"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M2 2.5L9 10L2 17.5"
+                            stroke="currentColor"
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </span>
                     </div>
-
-                    <p className="result-teaser">{result.plant.teaser}</p>
-
-                    <div className="result-chip-row">
-                      {result.previewChips.map((chip) => (
+                    <div className="result-chip-row catalog-result-chip-row">
+                      {result.previewChips.slice(0, 2).map((chip) => (
                         <span className="result-chip" key={chip}>
                           {chip}
                         </span>
@@ -2380,7 +3358,21 @@ function PlantsPage({
                     </div>
                   </button>
                 ))}
-              </div>
+                </div>
+                {hasMoreSearchResults ? (
+                  <div className="catalog-load-more-row">
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={() =>
+                        setVisibleResultCount((current) => current + SEARCH_RESULTS_BATCH_SIZE)
+                      }
+                    >
+                      {copy.library.loadMoreLabel}
+                    </button>
+                  </div>
+                ) : null}
+              </>
             ) : (
               <div className="empty-state-card">
                 <h3>{copy.library.emptyTitle}</h3>
@@ -2396,42 +3388,57 @@ function PlantsPage({
             type="button"
             className={isDetailOpen ? "detail-backdrop is-open" : "detail-backdrop"}
             aria-label={copy.library.closeDetail}
-            onClick={() => setIsDetailOpen(false)}
+            onClick={handleCloseDetail}
           />
 
-          <aside className={isDetailOpen ? "plant-detail-card is-open" : "plant-detail-card"}>
+          <aside
+            className={isDetailOpen ? "plant-detail-card is-open" : "plant-detail-card"}
+            onTouchStart={handleDetailTouchStart}
+            onTouchMove={handleDetailTouchMove}
+            onTouchEnd={handleDetailTouchEnd}
+            onTouchCancel={handleDetailTouchEnd}
+            style={
+              isDetailOpen && detailSwipeOffset > 0
+                ? { transform: `translateX(${detailSwipeOffset}px)` }
+                : undefined
+            }
+          >
             {selectedResult ? (
               <>
                 <div className="detail-header-row">
-                  <h3>
-                    {selectedResult.plant.icon} {selectedResult.plant.name}
-                  </h3>
+                  <h3>{selectedResult.plant.name}</h3>
                   <div className="detail-header-actions">
                     <button
                       type="button"
                       className="detail-close-button"
-                      onClick={() => setIsDetailOpen(false)}
+                      onClick={handleCloseDetail}
                     >
                       {copy.library.closeDetail}
                     </button>
                   </div>
                 </div>
-                <div className="plant-image-frame">
-                  {selectedResult.plant.image.src ? (
+                {selectedResult.plant.image.src ? (
+                  <button
+                    type="button"
+                    className="plant-image-frame plant-image-trigger"
+                    onClick={openImageViewer}
+                    aria-label={imageViewerLabels.open}
+                  >
                     <img
                       className="plant-image"
                       src={selectedResult.plant.image.src}
                       alt={selectedResult.plant.image.alt}
                     />
-                  ) : (
+                  </button>
+                ) : (
+                  <div className="plant-image-frame">
                     <div className="plant-image-placeholder" aria-hidden="true">
-                      <span className="plant-image-icon">{selectedResult.plant.icon}</span>
                       <span className="plant-image-copy">
                         {copy.library.labels.imageFallback}
                       </span>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
                 <div className="plant-meta-grid">
                   <div className="plant-meta-card is-primary">
                     <div className="plant-meta-top-row">
@@ -2645,6 +3652,67 @@ function PlantsPage({
               </div>
             )}
           </aside>
+
+          {selectedResult?.plant.image.src ? (
+            <div
+              className={
+                isImageViewerOpen ? "image-viewer-backdrop is-open" : "image-viewer-backdrop"
+              }
+              aria-hidden={!isImageViewerOpen}
+            >
+              <button
+                type="button"
+                className="image-viewer-dismiss"
+                aria-label={imageViewerLabels.close}
+                onClick={closeImageViewer}
+              />
+              <section
+                className={
+                  isImageViewerOpen ? "image-viewer-modal is-open" : "image-viewer-modal"
+                }
+                role="dialog"
+                aria-modal="true"
+                aria-label={selectedResult.plant.name}
+              >
+                <div className="image-viewer-head">
+                  <strong>{selectedResult.plant.name}</strong>
+                  <div className="image-viewer-actions">
+                    <button
+                      type="button"
+                      className="ghost-button image-viewer-action"
+                      onClick={handleZoomOut}
+                      disabled={imageZoomLevel <= 1}
+                    >
+                      {imageViewerLabels.zoomOut}
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-button image-viewer-action"
+                      onClick={handleZoomIn}
+                      disabled={imageZoomLevel >= 3}
+                    >
+                      {imageViewerLabels.zoomIn}
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-button image-viewer-action"
+                      onClick={closeImageViewer}
+                    >
+                      {imageViewerLabels.close}
+                    </button>
+                  </div>
+                </div>
+                <div className="image-viewer-canvas">
+                  <img
+                    className="image-viewer-image"
+                    src={selectedResult.plant.image.src}
+                    alt={selectedResult.plant.image.alt}
+                    style={{ transform: `scale(${imageZoomLevel})` }}
+                  />
+                </div>
+              </section>
+            </div>
+          ) : null}
         </div>
 
         <button
@@ -2746,6 +3814,7 @@ export default function App() {
   const initialAppState = getInitialAppState();
   const [language, setLanguage] = useState(initialAppState.language);
   const [page, setPage] = useState(initialAppState.page);
+  const [adminSection, setAdminSection] = useState(initialAppState.adminSection);
   const [plants, setPlants] = useState([]);
   const [plantsStatus, setPlantsStatus] = useState("loading");
   const [plantsError, setPlantsError] = useState("");
@@ -2754,6 +3823,11 @@ export default function App() {
   const [selectedPlantSlug, setSelectedPlantSlug] = useState(initialAppState.selectedPlantSlug);
   const [pendingSection, setPendingSection] = useState(null);
   const [catalogSeed, setCatalogSeed] = useState(initialAppState.catalogSeed);
+  const [plantsDetailSource, setPlantsDetailSource] = useState("plants");
+  const [isPlantsDetailRouteOpen, setIsPlantsDetailRouteOpen] = useState(
+    initialAppState.plantDetailOpen,
+  );
+  const [isSignOutConfirmOpen, setIsSignOutConfirmOpen] = useState(false);
   const [isDesktopPromptOpen, setIsDesktopPromptOpen] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
@@ -2764,6 +3838,14 @@ export default function App() {
     return window.innerWidth <= MOBILE_APP_BREAKPOINT;
   });
   const copy = content[language];
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
+  }, [language]);
 
   async function loadPlants() {
     try {
@@ -2895,10 +3977,6 @@ export default function App() {
   }, [page, pendingSection]);
 
   useEffect(() => {
-    if (page === "admin") {
-      return;
-    }
-
     if (typeof window === "undefined") {
       return;
     }
@@ -2908,10 +3986,34 @@ export default function App() {
       page,
       query: catalogSeed.query,
       plantSlug: page === "plants" ? selectedPlantSlug : null,
+      adminSection,
+      detailOpen: page === "plants" ? isPlantsDetailRouteOpen : false,
     });
 
     window.history.replaceState({}, "", nextUrl);
-  }, [catalogSeed.query, language, page, selectedPlantSlug]);
+  }, [adminSection, catalogSeed.query, isPlantsDetailRouteOpen, language, page, selectedPlantSlug]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const handlePopState = () => {
+      const nextState = getInitialAppState();
+      setLanguage(nextState.language);
+      setPage(nextState.page);
+      setAdminSection(nextState.adminSection);
+      setCatalogSeed(nextState.catalogSeed);
+      setSelectedPlantSlug(nextState.selectedPlantSlug);
+      setPlantsDetailSource("plants");
+      setIsPlantsDetailRouteOpen(nextState.plantDetailOpen);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -2934,29 +4036,40 @@ export default function App() {
     if (target === "plants") {
       setCatalogSeed({ query: "", openDetail: false });
       setSelectedPlantSlug(null);
+      setPlantsDetailSource("plants");
+      setIsPlantsDetailRouteOpen(false);
       setPage(target);
       return;
     }
 
     if (target === "saved" || target === "me") {
+      setIsPlantsDetailRouteOpen(false);
       setPage(target);
       return;
     }
 
+    setIsPlantsDetailRouteOpen(false);
     setPage("home");
     setPendingSection(target);
   }
 
+  function handleAdminNavigate(section) {
+    setPage("admin");
+    setAdminSection(section);
+  }
+
   function handleCatalogSearch(term, slug = null) {
     setCatalogSeed({ query: term, openDetail: Boolean(slug) });
-    if (slug) {
-      setSelectedPlantSlug(slug);
-    }
+    setSelectedPlantSlug(slug);
+    setPlantsDetailSource("plants");
+    setIsPlantsDetailRouteOpen(Boolean(slug));
     setPage("plants");
   }
 
   function handleBrowseOpen() {
     setCatalogSeed({ query: "", openDetail: false });
+    setPlantsDetailSource("plants");
+    setIsPlantsDetailRouteOpen(false);
     setPage("plants");
   }
 
@@ -2973,20 +4086,34 @@ export default function App() {
     await saveFavoritePlant(user.uid, plantId);
   }
 
-  function handleOpenSavedPlant(slug, query) {
-    setCatalogSeed({ query, openDetail: true });
+  function handleOpenSavedPlant(slug) {
+    setCatalogSeed({ query: "", openDetail: true });
     setSelectedPlantSlug(slug);
+    setPlantsDetailSource("saved");
+    setIsPlantsDetailRouteOpen(true);
     setPage("plants");
+  }
+
+  function handleReturnFromPlantDetail() {
+    setPlantsDetailSource("plants");
+    setIsPlantsDetailRouteOpen(false);
+    setPage("saved");
   }
 
   async function handleSignIn() {
     await signInWithGoogle();
   }
 
+  function requestSignOut() {
+    setIsSignOutConfirmOpen(true);
+  }
+
   async function handleSignOut() {
     await signOutUser();
+    setIsSignOutConfirmOpen(false);
     setPage("home");
-    if (typeof window !== "undefined" && window.location.pathname === "/admin") {
+    setAdminSection("home");
+    if (typeof window !== "undefined" && window.location.pathname.startsWith("/admin")) {
       window.history.replaceState({}, "", "/");
     }
   }
@@ -2998,9 +4125,23 @@ export default function App() {
         <div className="page-glow page-glow-right" />
         <AdminPage
           user={user}
+          plants={plants}
+          adminSection={adminSection}
+          confirmCopy={copy.confirm}
+          onAdminNavigate={handleAdminNavigate}
           onSignIn={handleSignIn}
-          onSignOut={handleSignOut}
+          onSignOut={requestSignOut}
           onPlantsChanged={loadPlants}
+        />
+        <ConfirmDialog
+          isOpen={isSignOutConfirmOpen}
+          title={copy.confirm.signOutTitle}
+          description={copy.confirm.signOutDescription}
+          confirmLabel={copy.confirm.signOutAction}
+          cancelLabel={copy.confirm.cancel}
+          onConfirm={handleSignOut}
+          onCancel={() => setIsSignOutConfirmOpen(false)}
+          isDestructive
         />
       </div>
     );
@@ -3022,63 +4163,80 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
-      <div className="page-glow page-glow-left" />
-      <div className="page-glow page-glow-right" />
-      <Header
-        copy={copy}
-        page={page}
-        language={language}
-        onNavigate={handleNavigate}
-        onLanguageChange={setLanguage}
-        isScrolled={hasScrolled}
-      />
-      <main>
-        {page === "home" ? (
-          <HomePage
-            copy={copy}
-            language={language}
-            plants={plants}
-            onSearchSubmit={handleCatalogSearch}
-            onBrowseOpen={handleBrowseOpen}
-            onPlantOpen={(plant) => handleCatalogSearch(plant.query, plant.slug)}
-          />
-        ) : page === "saved" ? (
-          <SavedPage
-            copy={copy}
-            language={language}
-            plants={plants}
-            favoritePlantIds={favoritePlantIds}
-            user={user}
-            onOpenPlant={handleOpenSavedPlant}
-            onSignIn={handleSignIn}
-          />
-        ) : page === "me" ? (
-          <MePage
-            copy={copy}
-            user={user}
-            favoriteCount={favoritePlantIds.length}
-            onSignIn={handleSignIn}
-            onSignOut={handleSignOut}
-          />
-        ) : (
-          <PlantsPage
-            copy={copy}
-            language={language}
-            plants={plants}
-            isLoading={plantsStatus === "loading"}
-            loadError={plantsError}
-            user={user}
-            favoritePlantIds={favoritePlantIds}
-            onToggleFavorite={handleToggleFavorite}
-            onSignIn={handleSignIn}
-            selectedPlantSlug={selectedPlantSlug}
-            searchSeed={catalogSeed}
-            onSelectPlant={setSelectedPlantSlug}
-          />
-        )}
-      </main>
+    <>
+      <div className="app-shell">
+        <div className="page-glow page-glow-left" />
+        <div className="page-glow page-glow-right" />
+        <Header
+          copy={copy}
+          page={page}
+          language={language}
+          onNavigate={handleNavigate}
+          onLanguageChange={setLanguage}
+          isScrolled={hasScrolled}
+        />
+        <main>
+          {page === "home" ? (
+            <HomePage
+              copy={copy}
+              language={language}
+              plants={plants}
+              onSearchSubmit={handleCatalogSearch}
+              onBrowseOpen={handleBrowseOpen}
+              onPlantOpen={(plant) => handleCatalogSearch(plant.query, plant.slug)}
+            />
+          ) : page === "saved" ? (
+            <SavedPage
+              copy={copy}
+              language={language}
+              plants={plants}
+              favoritePlantIds={favoritePlantIds}
+              user={user}
+              onOpenPlant={handleOpenSavedPlant}
+              onSignIn={handleSignIn}
+            />
+          ) : page === "me" ? (
+            <MePage
+              copy={copy}
+              user={user}
+              favoriteCount={favoritePlantIds.length}
+              language={language}
+              onLanguageChange={setLanguage}
+              onSignIn={handleSignIn}
+              onSignOut={requestSignOut}
+            />
+          ) : (
+            <PlantsPage
+              copy={copy}
+              language={language}
+              plants={plants}
+              isLoading={plantsStatus === "loading"}
+              loadError={plantsError}
+              user={user}
+              favoritePlantIds={favoritePlantIds}
+              onToggleFavorite={handleToggleFavorite}
+              onSignIn={handleSignIn}
+              selectedPlantSlug={selectedPlantSlug}
+              searchSeed={catalogSeed}
+              onSelectPlant={setSelectedPlantSlug}
+              detailEntrySource={plantsDetailSource}
+              onReturnToSource={handleReturnFromPlantDetail}
+              onDetailStateChange={setIsPlantsDetailRouteOpen}
+            />
+          )}
+        </main>
+        <ConfirmDialog
+          isOpen={isSignOutConfirmOpen}
+          title={copy.confirm.signOutTitle}
+          description={copy.confirm.signOutDescription}
+          confirmLabel={copy.confirm.signOutAction}
+          cancelLabel={copy.confirm.cancel}
+          onConfirm={handleSignOut}
+          onCancel={() => setIsSignOutConfirmOpen(false)}
+          isDestructive
+        />
+      </div>
       <MobileNav copy={copy} page={page} onNavigate={handleNavigate} />
-    </div>
+    </>
   );
 }

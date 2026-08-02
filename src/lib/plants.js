@@ -80,6 +80,31 @@ function findHits(values, query) {
   return values.filter((value) => normalizeText(value).includes(query));
 }
 
+function getBucketScore(values, query, baseWeight) {
+  if (!query) {
+    return 0;
+  }
+
+  return values.reduce((total, value) => {
+    const normalizedValue = normalizeText(value);
+    if (!normalizedValue || !normalizedValue.includes(query)) {
+      return total;
+    }
+
+    let bonus = 1;
+
+    if (normalizedValue === query) {
+      bonus += 18;
+    } else if (normalizedValue.startsWith(query)) {
+      bonus += 10;
+    } else if (normalizedValue.split(/[\s,;/()-]+/).includes(query)) {
+      bonus += 6;
+    }
+
+    return total + baseWeight + bonus;
+  }, 0);
+}
+
 export function getSearchResult(plant, query) {
   const hits = {
     names: [],
@@ -109,22 +134,12 @@ export function getSearchResult(plant, query) {
       query,
     );
 
-    const weightedScores = {
-      names: 60,
-      conditions: 44,
-      uses: 40,
-      remedies: 24,
-      context: 14,
-    };
-
-    score = Object.keys(weightedScores).reduce((total, bucket) => {
-      const bucketHits = hits[bucket];
-      if (!bucketHits.length) {
-        return total;
-      }
-
-      return total + weightedScores[bucket] + bucketHits.length;
-    }, 0);
+    score =
+      getBucketScore(hits.names, query, 60) +
+      getBucketScore(hits.conditions, query, 72) +
+      getBucketScore(hits.uses, query, 56) +
+      getBucketScore(hits.remedies, query, 24) +
+      getBucketScore(hits.context, query, 8);
 
     if (score === 0) {
       return null;
@@ -205,4 +220,8 @@ export async function removeFavoritePlant(userId, plantId) {
 
 export async function savePlantRecord(record) {
   await setDoc(doc(db, "plants", record.id), record);
+}
+
+export async function deletePlantRecord(plantId) {
+  await deleteDoc(doc(db, "plants", plantId));
 }
