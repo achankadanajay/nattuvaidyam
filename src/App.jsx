@@ -18,6 +18,63 @@ const MOBILE_APP_BREAKPOINT = 720;
 const ADMIN_EMAIL = "ajyghosh@gmail.com";
 const SEARCH_RESULTS_BATCH_SIZE = 24;
 const LANGUAGE_STORAGE_KEY = "nattuvaidyam-language";
+const INSTALL_PROMPT_STORAGE_KEY = "nattuvaidyam-install-prompt-dismissed-until-v3";
+const INSTALL_PROMPT_FOREVER_STORAGE_KEY = "nattuvaidyam-install-prompt-dismissed-forever-v3";
+const INSTALL_PROMPT_DISMISS_MS = 15 * 24 * 60 * 60 * 1000;
+
+function getInstallPromptCooldownUntil() {
+  if (typeof window === "undefined") {
+    return 0;
+  }
+
+  const storedValue = Number(window.localStorage.getItem(INSTALL_PROMPT_STORAGE_KEY));
+
+  if (!Number.isFinite(storedValue) || storedValue <= Date.now()) {
+    window.localStorage.removeItem(INSTALL_PROMPT_STORAGE_KEY);
+    return 0;
+  }
+
+  return storedValue;
+}
+
+function getInstallPromptDismissedForever() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem(INSTALL_PROMPT_FOREVER_STORAGE_KEY) === "true";
+}
+
+function detectInstallPlatform() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const userAgent = window.navigator.userAgent || "";
+  const isTouchMac =
+    window.navigator.platform === "MacIntel" && window.navigator.maxTouchPoints > 1;
+
+  if (/android/i.test(userAgent)) {
+    return "android";
+  }
+
+  if (/(iphone|ipad|ipod)/i.test(userAgent) || isTouchMac) {
+    return "ios";
+  }
+
+  return null;
+}
+
+function isStandaloneApp() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true
+  );
+}
 
 const content = {
   ml: {
@@ -112,11 +169,33 @@ const content = {
       favoritesLabel: "സേവ് ചെയ്ത സസ്യങ്ങൾ",
       languageLabel: "ഇഷ്ടഭാഷ",
       languageNote: "ഇവിടെ തിരഞ്ഞെടുക്കുന്ന ഭാഷ പിന്നീട് default ആയി തുടരാം.",
+      installLabel: "ആപ്പ് ഇൻസ്റ്റാൾ",
+      installNote: "ഓട്ടോമാറ്റിക് popup അടച്ചാലും ഇവിടെ നിന്ന് install guide വീണ്ടും തുറക്കാം.",
+      installAction: "Install guide",
       languageChoices: {
         en: "English",
         ml: "Malayalam",
       },
       note: "നിങ്ങൾ save ചെയ്യുന്ന സസ്യങ്ങൾ പിന്നീട് എളുപ്പത്തിൽ വീണ്ടും കാണാനായി നിങ്ങളുടെ അക്കൗണ്ടിൽ സൂക്ഷിക്കും.",
+    },
+    installPrompt: {
+      eyebrow: "ആപ്പ് ഇൻസ്റ്റാൾ",
+      title: "Nattuvaidyam ഹോം സ്ക്രീനിൽ വെക്കൂ",
+      description:
+        "സസ്യങ്ങൾ വേഗത്തിൽ തുറക്കാനും mobile app പോലെ ഒരു tap-ൽ ഉപയോഗിക്കാനും ഹോം സ്ക്രീനിലേക്ക് ചേർക്കൂ.",
+      iosHint: "iPhone-ൽ Safari ഉപയോഗിക്കുമ്പോൾ താഴെയുള്ള steps പിന്തുടരൂ.",
+      iosSteps: [
+        "Safari-യിലെ Share button തട്ടൂ",
+        "\"Add to Home Screen\" തിരഞ്ഞെടുക്കൂ",
+        "\"Add\" തട്ടി പൂർത്തിയാക്കൂ",
+      ],
+      androidHint: "ഒരു tap മതി. app നിങ്ങളുടെ ഫോണിൽ install prompt തുറക്കും.",
+      androidManualHint:
+        "Install prompt കാണുന്നില്ലെങ്കിൽ browser menu തുറന്ന് \"Add to Home screen\" അല്ലെങ്കിൽ \"Install app\" തിരഞ്ഞെടുക്കൂ.",
+      later: "പിന്നീട്",
+      iosAction: "ശരി",
+      androidAction: "Install",
+      androidManualAction: "ശരി",
     },
     stats: {
       eyebrow: "വളരുന്ന അറിവുകളുടെ ശേഖരം",
@@ -152,6 +231,9 @@ const content = {
       filtersCountLabel: "ഫിൽട്ടറുകൾ",
       activeFilterLabel: "ഫിൽട്ടർ സജീവമാണ്",
       activeFiltersLabel: "ഫിൽട്ടറുകൾ സജീവമാണ്",
+      backToResultsLabel: "ഫലങ്ങളിലേക്ക് മടങ്ങുക",
+      backToSavedLabel: "സേവ് ചെയ്ത സസ്യങ്ങളിലേക്ക് മടങ്ങുക",
+      nextPlantLabel: "അടുത്ത സസ്യം",
       emptyTitle: "ഫലങ്ങൾ ലഭിച്ചില്ല",
       emptyDescription:
         "മറ്റൊരു spelling ശ്രമിക്കുകയോ filters clear ചെയ്യുകയോ ചെയ്യൂ. വലിയ dataset-ലും തിരച്ചിൽ സഹായിക്കാൻ ഈ പേജ് query-based filtering ഉപയോഗിക്കുന്നു.",
@@ -284,11 +366,33 @@ const content = {
       favoritesLabel: "Saved plants",
       languageLabel: "Preferred language",
       languageNote: "Your selection here will be saved as the default language.",
+      installLabel: "Install app",
+      installNote: "Open the install guide here any time, even after closing the auto popup.",
+      installAction: "Open install guide",
       languageChoices: {
         en: "English",
         ml: "Malayalam",
       },
       note: "Plants you save stay available in your account so you can come back to them later.",
+    },
+    installPrompt: {
+      eyebrow: "Install app",
+      title: "Keep Nattuvaidyam on your home screen",
+      description:
+        "Open plants faster, keep the app one tap away, and use the mobile experience like an installed app.",
+      iosHint: "On iPhone, follow these Safari steps to add the app.",
+      iosSteps: [
+        "Tap the Share button in Safari",
+        "Choose Add to Home Screen",
+        "Tap Add",
+      ],
+      androidHint: "One tap opens the install prompt on your phone.",
+      androidManualHint:
+        "If the install prompt does not appear yet, open the browser menu and choose Add to Home screen or Install app.",
+      later: "Later",
+      iosAction: "Got it",
+      androidAction: "Install",
+      androidManualAction: "Got it",
     },
     stats: {
       eyebrow: "Growing knowledge base",
@@ -325,6 +429,9 @@ const content = {
       filtersCountLabel: "filters",
       activeFilterLabel: "active filter",
       activeFiltersLabel: "active filters",
+      backToResultsLabel: "Back to results",
+      backToSavedLabel: "Back to saved plants",
+      nextPlantLabel: "Next plant",
       emptyTitle: "No matching plants found",
       emptyDescription:
         "Try another spelling or clear your filters. The catalog search is designed to support larger datasets with layered filtering.",
@@ -1000,7 +1107,7 @@ function getKnowledgeStats(plants) {
   };
 }
 
-function Header({ copy, page, language, onNavigate, onLanguageChange, isScrolled }) {
+function Header({ copy, page, onNavigate, isScrolled }) {
   return (
     <header className={isScrolled ? "site-header is-scrolled" : "site-header"}>
       <div className="brand">
@@ -1028,24 +1135,6 @@ function Header({ copy, page, language, onNavigate, onLanguageChange, isScrolled
             </button>
           ))}
         </nav>
-
-        {page === "me" ? (
-          <div className="language-switcher">
-            <div className="language-toggle" role="tablist" aria-label="Language switcher">
-              {Object.entries(copy.languageOptions).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={value === language ? "toggle-chip is-active" : "toggle-chip"}
-                  onClick={() => onLanguageChange(value)}
-                  aria-pressed={value === language}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
       </div>
     </header>
   );
@@ -2438,7 +2527,20 @@ function SavedPage({ copy, language, plants, favoritePlantIds, user, onOpenPlant
   );
 }
 
-function MePage({ copy, user, favoriteCount, language, onLanguageChange, onSignIn, onSignOut }) {
+function MePage({
+  copy,
+  user,
+  favoriteCount,
+  language,
+  canShowInstallEntry,
+  onOpenInstallPrompt,
+  onLanguageChange,
+  onSignIn,
+  onSignOut,
+}) {
+  const isMalayalam = language === "ml";
+  const nextLanguage = isMalayalam ? "en" : "ml";
+
   return (
     <section className="plants-page">
       <div className="content-section">
@@ -2471,27 +2573,49 @@ function MePage({ copy, user, favoriteCount, language, onLanguageChange, onSignI
                   <strong>{copy.me.languageLabel}</strong>
                   <p>{copy.me.languageNote}</p>
                 </div>
-                <div
-                  className="account-language-toggle"
-                  role="tablist"
-                  aria-label={copy.me.languageLabel}
+                <button
+                  type="button"
+                  className={isMalayalam ? "account-language-switch is-ml" : "account-language-switch is-en"}
+                  role="switch"
+                  aria-checked={isMalayalam}
+                  aria-label={`${copy.me.languageLabel}: ${copy.me.languageChoices[language]}`}
+                  onClick={() => onLanguageChange(nextLanguage)}
                 >
-                  {Object.entries(copy.me.languageChoices).map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className={value === language ? "toggle-chip is-active" : "toggle-chip"}
-                      onClick={() => onLanguageChange(value)}
-                      aria-pressed={value === language}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
+                  <span
+                    className={!isMalayalam ? "account-language-option is-selected" : "account-language-option"}
+                    aria-hidden="true"
+                  >
+                    E
+                  </span>
+                  <span
+                    className={isMalayalam ? "account-language-option is-selected" : "account-language-option"}
+                    aria-hidden="true"
+                  >
+                    മ
+                  </span>
+                  <span className="account-language-thumb" aria-hidden="true">
+                    {isMalayalam ? "മ" : "E"}
+                  </span>
+                </button>
               </div>
               <div className="account-note-card">
                 <p className="account-note">{copy.me.note}</p>
               </div>
+              {canShowInstallEntry ? (
+                <div className="account-preference-card">
+                  <div className="account-preference-copy">
+                    <strong>{copy.me.installLabel}</strong>
+                    <p>{copy.me.installNote}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="ghost-button account-install-button"
+                    onClick={onOpenInstallPrompt}
+                  >
+                    {copy.me.installAction}
+                  </button>
+                </div>
+              ) : null}
               <button
                 type="button"
                 className="ghost-button auth-action-button account-signout-button is-destructive"
@@ -2509,6 +2633,102 @@ function MePage({ copy, user, favoriteCount, language, onLanguageChange, onSignI
             />
           )}
         </section>
+      </div>
+    </section>
+  );
+}
+
+function BuyMeACoffeeButton() {
+  return (
+    <section className="detail-support-card" aria-label="Support Nattuvaidyam">
+      <a
+        className="detail-support-link"
+        href="https://buymeacoffee.com/nattuvaidyam"
+        target="_blank"
+        rel="noreferrer"
+      >
+        <span className="detail-support-link-emoji" aria-hidden="true">
+          ☕
+        </span>
+        <span>Buy me a coffee</span>
+      </a>
+    </section>
+  );
+}
+
+function InstallPromptPopup({
+  copy,
+  platform,
+  canTriggerNativeInstall,
+  onLater,
+  onPrimaryAction,
+}) {
+  const isIos = platform === "ios";
+  const androidHint = canTriggerNativeInstall
+    ? copy.installPrompt.androidHint
+    : copy.installPrompt.androidManualHint;
+  const actionLabel = isIos
+    ? copy.installPrompt.iosAction
+    : canTriggerNativeInstall
+      ? copy.installPrompt.androidAction
+      : copy.installPrompt.androidManualAction;
+
+  return (
+    <section
+      className="install-prompt-popup"
+      role="dialog"
+      aria-modal="false"
+      aria-labelledby="install-prompt-title"
+    >
+      <div className="install-prompt-topbar">
+        <div className="install-prompt-badge">{copy.installPrompt.eyebrow}</div>
+        <button
+          type="button"
+          className="install-prompt-close"
+          aria-label={copy.confirm.cancel}
+          onClick={onLater}
+        >
+          ×
+        </button>
+      </div>
+      <div className="install-prompt-head">
+        <div className="install-prompt-icon" aria-hidden="true">
+          {isIos ? "📲" : "⬇"}
+        </div>
+        <div className="install-prompt-copy">
+          <strong id="install-prompt-title">{copy.installPrompt.title}</strong>
+          <p>{copy.installPrompt.description}</p>
+        </div>
+      </div>
+
+      {isIos ? (
+        <div className="install-prompt-steps-wrap">
+          <p className="install-prompt-hint">{copy.installPrompt.iosHint}</p>
+          <ol className="install-prompt-steps">
+            {copy.installPrompt.iosSteps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+        </div>
+      ) : (
+        <p className="install-prompt-hint">{androidHint}</p>
+      )}
+
+      <div className="install-prompt-actions">
+        <button
+          type="button"
+          className="install-prompt-secondary"
+          onClick={onLater}
+        >
+          {copy.installPrompt.later}
+        </button>
+        <button
+          type="button"
+          className="install-prompt-primary"
+          onClick={onPrimaryAction}
+        >
+          {actionLabel}
+        </button>
       </div>
     </section>
   );
@@ -2867,8 +3087,7 @@ function PlantsPage({
   onReturnToSource,
   onDetailStateChange,
 }) {
-  const DETAIL_SWIPE_EDGE = 32;
-  const DETAIL_SWIPE_CLOSE_THRESHOLD = 88;
+  const DETAIL_SWIPE_THRESHOLD = 88;
   const localizedPlants = plants.map((plant) => localizePlant(plant, language));
   const [searchQuery, setSearchQuery] = useState(searchSeed.query);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -2878,9 +3097,11 @@ function PlantsPage({
   const [shareState, setShareState] = useState("idle");
   const [visibleResultCount, setVisibleResultCount] = useState(SEARCH_RESULTS_BATCH_SIZE);
   const [detailSwipeOffset, setDetailSwipeOffset] = useState(0);
+  const [detailLanguageOverride, setDetailLanguageOverride] = useState(null);
   const [shouldAutoOpenDetail, setShouldAutoOpenDetail] = useState(
     Boolean(searchSeed.openDetail && selectedPlantSlug),
   );
+  const detailCardRef = useRef(null);
   const detailSwipeStateRef = useRef({
     startX: 0,
     startY: 0,
@@ -2950,6 +3171,27 @@ function PlantsPage({
   }, [detailSwipeOffset, isDetailOpen]);
 
   useEffect(() => {
+    if (!isDetailOpen && detailLanguageOverride !== null) {
+      setDetailLanguageOverride(null);
+    }
+  }, [detailLanguageOverride, isDetailOpen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !isDetailOpen || !selectedPlantSlug) {
+      return undefined;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      detailCardRef.current?.scrollTo?.({ top: 0, left: 0, behavior: "auto" });
+      window.scrollTo({ top: 0, behavior: "auto" });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [isDetailOpen, selectedPlantSlug]);
+
+  useEffect(() => {
     setVisibleResultCount(SEARCH_RESULTS_BATCH_SIZE);
   }, [deferredQuery]);
 
@@ -3016,13 +3258,31 @@ function PlantsPage({
 
   const selectedResult =
     searchResults.find((result) => result.plant.slug === selectedPlantSlug) ?? null;
+  const selectedPlantRecord = plants.find((plant) => plant.id === selectedPlantSlug) ?? null;
+  const selectedResultIndex = selectedResult
+    ? searchResults.findIndex((result) => result.plant.slug === selectedResult.plant.slug)
+    : -1;
   const activeFilterCount = trimmedSearchQuery ? 1 : 0;
   const hasCatalog = localizedPlants.length > 0;
   const isSelectedSaved = selectedResult
     ? favoritePlantIds.includes(selectedResult.plant.slug)
     : false;
+  const detailLanguage = detailLanguageOverride ?? language;
+  const detailCopy = content[detailLanguage];
+  const detailLibraryCopy = detailCopy.library;
+  const selectedDetailPlant = selectedPlantRecord
+    ? localizePlant(selectedPlantRecord, detailLanguage)
+    : null;
+  const isMalayalam = detailLanguage === "ml";
+  const nextLanguage = isMalayalam ? "en" : "ml";
+  const nextLanguageLabel = detailCopy.languageOptions[nextLanguage];
+  const hasNextPlant = selectedResultIndex >= 0 && selectedResultIndex < searchResults.length - 1;
+  const detailBackLabel =
+    detailEntrySource === "saved"
+      ? content.en.library.backToSavedLabel
+      : content.en.library.backToResultsLabel;
   const imageViewerLabels =
-    language === "ml"
+    detailLanguage === "ml"
       ? {
           close: "അടയ്ക്കുക",
           zoomIn: "വലുതാക്കുക",
@@ -3098,6 +3358,7 @@ function PlantsPage({
       page: "plants",
       query: trimmedSearchQuery,
       plantSlug: plant.slug,
+      detailOpen: true,
     });
 
     const shareData = {
@@ -3128,6 +3389,31 @@ function PlantsPage({
     }
   }
 
+  function handleSelectAdjacentResult(direction) {
+    if (!searchResults.length || selectedResultIndex < 0) {
+      return;
+    }
+
+    const nextIndex = selectedResultIndex + direction;
+
+    if (nextIndex < 0) {
+      handleCloseDetail();
+      return;
+    }
+
+    const nextResult = searchResults[nextIndex];
+    if (!nextResult) {
+      setDetailSwipeOffset(0);
+      return;
+    }
+
+    onSelectPlant(nextResult.plant.slug);
+    setIsDetailOpen(true);
+    onDetailStateChange(true);
+    setShouldAutoOpenDetail(false);
+    setDetailSwipeOffset(0);
+  }
+
   function handleDetailTouchStart(event) {
     if (!isDetailOpen || isImageViewerOpen || isMobileSearchOpen) {
       return;
@@ -3138,17 +3424,12 @@ function PlantsPage({
       return;
     }
 
-    const shouldTrack = touch.clientX <= DETAIL_SWIPE_EDGE;
     detailSwipeStateRef.current = {
       startX: touch.clientX,
       startY: touch.clientY,
-      active: shouldTrack,
-      tracking: shouldTrack,
+      active: true,
+      tracking: true,
     };
-
-    if (!shouldTrack && detailSwipeOffset !== 0) {
-      setDetailSwipeOffset(0);
-    }
   }
 
   function handleDetailTouchMove(event) {
@@ -3168,17 +3449,15 @@ function PlantsPage({
       return;
     }
 
-    if (deltaX <= 0) {
-      setDetailSwipeOffset(0);
-      return;
-    }
-
-    setDetailSwipeOffset(Math.min(deltaX, 160));
+    setDetailSwipeOffset(Math.max(Math.min(deltaX, 160), -160));
   }
 
   function handleDetailTouchEnd() {
     const swipeState = detailSwipeStateRef.current;
-    const shouldClose = swipeState.active && detailSwipeOffset >= DETAIL_SWIPE_CLOSE_THRESHOLD;
+    const shouldGoPrevious =
+      swipeState.active && detailSwipeOffset >= DETAIL_SWIPE_THRESHOLD;
+    const shouldGoNext =
+      swipeState.active && detailSwipeOffset <= -DETAIL_SWIPE_THRESHOLD;
 
     detailSwipeStateRef.current = {
       startX: 0,
@@ -3187,8 +3466,13 @@ function PlantsPage({
       tracking: false,
     };
 
-    if (shouldClose) {
-      handleCloseDetail();
+    if (shouldGoPrevious) {
+      handleSelectAdjacentResult(-1);
+      return;
+    }
+
+    if (shouldGoNext) {
+      handleSelectAdjacentResult(1);
       return;
     }
 
@@ -3392,6 +3676,7 @@ function PlantsPage({
           />
 
           <aside
+            ref={detailCardRef}
             className={isDetailOpen ? "plant-detail-card is-open" : "plant-detail-card"}
             onTouchStart={handleDetailTouchStart}
             onTouchMove={handleDetailTouchMove}
@@ -3403,21 +3688,45 @@ function PlantsPage({
                 : undefined
             }
           >
-            {selectedResult ? (
+            {selectedResult && selectedDetailPlant ? (
               <>
                 <div className="detail-header-row">
-                  <h3>{selectedResult.plant.name}</h3>
+                  <h3>{selectedDetailPlant.name}</h3>
                   <div className="detail-header-actions">
                     <button
                       type="button"
-                      className="detail-close-button"
+                      className="detail-language-button"
+                      aria-label={`${detailCopy.me.languageLabel}: ${detailCopy.me.languageChoices[nextLanguage]}`}
+                      title={detailCopy.me.languageChoices[nextLanguage]}
+                      onClick={() => setDetailLanguageOverride(nextLanguage)}
+                    >
+                      {nextLanguageLabel}
+                    </button>
+                    <button
+                      type="button"
+                      className="detail-close-icon-button"
+                      aria-label={detailLibraryCopy.closeDetail}
+                      title={detailLibraryCopy.closeDetail}
                       onClick={handleCloseDetail}
                     >
-                      {copy.library.closeDetail}
+                      <svg
+                        className="detail-icon-svg"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M6 6 18 18M18 6 6 18"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                        />
+                      </svg>
                     </button>
                   </div>
                 </div>
-                {selectedResult.plant.image.src ? (
+                {selectedDetailPlant.image.src ? (
                   <button
                     type="button"
                     className="plant-image-frame plant-image-trigger"
@@ -3426,15 +3735,15 @@ function PlantsPage({
                   >
                     <img
                       className="plant-image"
-                      src={selectedResult.plant.image.src}
-                      alt={selectedResult.plant.image.alt}
+                      src={selectedDetailPlant.image.src}
+                      alt={selectedDetailPlant.image.alt}
                     />
                   </button>
                 ) : (
                   <div className="plant-image-frame">
                     <div className="plant-image-placeholder" aria-hidden="true">
                       <span className="plant-image-copy">
-                        {copy.library.labels.imageFallback}
+                        {detailLibraryCopy.labels.imageFallback}
                       </span>
                     </div>
                   </div>
@@ -3444,10 +3753,10 @@ function PlantsPage({
                     <div className="plant-meta-top-row">
                       <div className="plant-meta-copy">
                         <span className="plant-meta-label">
-                          {copy.library.labels.scientific}
+                          {detailLibraryCopy.labels.scientific}
                         </span>
                         <strong className="plant-meta-value">
-                          {selectedResult.plant.scientific}
+                          {selectedDetailPlant.scientific}
                         </strong>
                       </div>
                       <div className="plant-meta-utility-actions">
@@ -3456,19 +3765,19 @@ function PlantsPage({
                           className="detail-icon-button"
                           aria-label={
                             shareState === "shared"
-                              ? copy.library.sharedLabel
+                              ? detailLibraryCopy.sharedLabel
                               : shareState === "copied"
-                                ? copy.library.copiedLabel
-                                : copy.library.shareLabel
+                                ? detailLibraryCopy.copiedLabel
+                                : detailLibraryCopy.shareLabel
                           }
                           title={
                             shareState === "shared"
-                              ? copy.library.sharedLabel
+                              ? detailLibraryCopy.sharedLabel
                               : shareState === "copied"
-                                ? copy.library.copiedLabel
-                                : copy.library.shareLabel
+                                ? detailLibraryCopy.copiedLabel
+                                : detailLibraryCopy.shareLabel
                           }
-                          onClick={() => handleSharePlant(selectedResult.plant)}
+                          onClick={() => handleSharePlant(selectedDetailPlant)}
                         >
                           <svg
                             className="detail-icon-svg"
@@ -3498,16 +3807,16 @@ function PlantsPage({
                           aria-label={
                             user
                               ? isSelectedSaved
-                                ? copy.library.savedLabel
-                                : copy.library.saveLabel
-                              : copy.library.signInToSave
+                                ? detailLibraryCopy.savedLabel
+                                : detailLibraryCopy.saveLabel
+                              : detailLibraryCopy.signInToSave
                           }
                           title={
                             user
                               ? isSelectedSaved
-                                ? copy.library.savedLabel
-                                : copy.library.saveLabel
-                              : copy.library.signInToSave
+                                ? detailLibraryCopy.savedLabel
+                                : detailLibraryCopy.saveLabel
+                              : detailLibraryCopy.signInToSave
                           }
                           onClick={() => {
                             if (!user) {
@@ -3515,7 +3824,7 @@ function PlantsPage({
                               return;
                             }
 
-                            void onToggleFavorite(selectedResult.plant.slug, isSelectedSaved);
+                            void onToggleFavorite(selectedDetailPlant.slug, isSelectedSaved);
                           }}
                         >
                           <svg
@@ -3539,22 +3848,22 @@ function PlantsPage({
                       </div>
                     </div>
                   </div>
-                  {selectedResult.plant.family ? (
+                  {selectedDetailPlant.family ? (
                     <div className="plant-meta-card">
-                      <span className="plant-meta-label">{copy.library.labels.family}</span>
+                      <span className="plant-meta-label">{detailLibraryCopy.labels.family}</span>
                       <strong className="plant-meta-value">
-                        {selectedResult.plant.family}
+                        {selectedDetailPlant.family}
                       </strong>
                     </div>
                   ) : null}
                 </div>
-                <p className="plant-summary">{selectedResult.plant.summary}</p>
+                <p className="plant-summary">{selectedDetailPlant.summary}</p>
 
-                {!!selectedResult.plant.aliases.length && (
+                {!!selectedDetailPlant.aliases.length && (
                   <section className="detail-block">
-                    <h4>{copy.library.labels.aliases}</h4>
+                    <h4>{detailLibraryCopy.labels.aliases}</h4>
                     <div className="detail-pill-row">
-                      {selectedResult.plant.aliases.map((item) => (
+                      {selectedDetailPlant.aliases.map((item) => (
                         <span className="detail-pill" key={item}>
                           {item}
                         </span>
@@ -3565,9 +3874,9 @@ function PlantsPage({
 
                 <div className="detail-grid">
                   <section className="detail-block">
-                    <h4>{copy.library.labels.uses}</h4>
+                    <h4>{detailLibraryCopy.labels.uses}</h4>
                     <div className="detail-pill-row">
-                      {selectedResult.plant.uses.map((item) => (
+                      {selectedDetailPlant.uses.map((item) => (
                         <span className="detail-pill" key={item}>
                           {item}
                         </span>
@@ -3576,9 +3885,9 @@ function PlantsPage({
                   </section>
 
                   <section className="detail-block">
-                    <h4>{copy.library.labels.parts}</h4>
+                    <h4>{detailLibraryCopy.labels.parts}</h4>
                     <div className="detail-pill-row">
-                      {selectedResult.plant.parts.map((item) => (
+                      {selectedDetailPlant.parts.map((item) => (
                         <span className="detail-pill" key={item}>
                           {item}
                         </span>
@@ -3587,39 +3896,39 @@ function PlantsPage({
                   </section>
                 </div>
 
-                {selectedResult.plant.overview ? (
+                {selectedDetailPlant.overview ? (
                   <section className="detail-block">
-                    <h4>{copy.library.labels.overview}</h4>
-                    <p>{selectedResult.plant.overview}</p>
+                    <h4>{detailLibraryCopy.labels.overview}</h4>
+                    <p>{selectedDetailPlant.overview}</p>
                   </section>
                 ) : null}
 
-                {selectedResult.plant.characteristics ? (
+                {selectedDetailPlant.characteristics ? (
                   <section className="detail-block">
-                    <h4>{copy.library.labels.characteristics}</h4>
-                    <p>{selectedResult.plant.characteristics}</p>
+                    <h4>{detailLibraryCopy.labels.characteristics}</h4>
+                    <p>{selectedDetailPlant.characteristics}</p>
                   </section>
                 ) : null}
 
-                {selectedResult.plant.habitat ? (
+                {selectedDetailPlant.habitat ? (
                   <section className="detail-block">
-                    <h4>{copy.library.labels.habitat}</h4>
-                    <p>{selectedResult.plant.habitat}</p>
+                    <h4>{detailLibraryCopy.labels.habitat}</h4>
+                    <p>{selectedDetailPlant.habitat}</p>
                   </section>
                 ) : null}
 
-                {selectedResult.plant.properties ? (
+                {selectedDetailPlant.properties ? (
                   <section className="detail-block">
-                    <h4>{copy.library.labels.properties}</h4>
-                    <p>{selectedResult.plant.properties}</p>
+                    <h4>{detailLibraryCopy.labels.properties}</h4>
+                    <p>{selectedDetailPlant.properties}</p>
                   </section>
                 ) : null}
 
-                {!!selectedResult.plant.constituents.length && (
+                {!!selectedDetailPlant.constituents.length && (
                   <section className="detail-block">
-                    <h4>{copy.library.labels.constituents}</h4>
+                    <h4>{detailLibraryCopy.labels.constituents}</h4>
                     <ul className="detail-list">
-                      {selectedResult.plant.constituents.map((item) => (
+                      {selectedDetailPlant.constituents.map((item) => (
                         <li key={item.part}>
                           <strong>{item.part}</strong>: {item.description}
                         </li>
@@ -3628,11 +3937,11 @@ function PlantsPage({
                   </section>
                 )}
 
-                {!!selectedResult.plant.treatments.length && (
+                {!!selectedDetailPlant.treatments.length && (
                   <section className="detail-block">
-                    <h4>{copy.library.labels.treatments}</h4>
+                    <h4>{detailLibraryCopy.labels.treatments}</h4>
                     <div className="detail-treatment-list">
-                      {selectedResult.plant.treatments.map((item) => (
+                      {selectedDetailPlant.treatments.map((item) => (
                         <article
                           className="detail-treatment-item"
                           key={`${item.condition}-${item.remedy}`}
@@ -3644,16 +3953,36 @@ function PlantsPage({
                     </div>
                   </section>
                 )}
+
+                <div className="detail-bottom-actions">
+                  <button
+                    type="button"
+                    className="ghost-button detail-bottom-action"
+                    onClick={handleCloseDetail}
+                  >
+                    {detailBackLabel}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button detail-bottom-action detail-bottom-action-primary"
+                    onClick={() => handleSelectAdjacentResult(1)}
+                    disabled={!hasNextPlant}
+                  >
+                    {copy.library.nextPlantLabel}
+                  </button>
+                </div>
+
+                <BuyMeACoffeeButton />
               </>
             ) : (
               <div className="empty-state-card is-detail">
-                <h3>{copy.library.emptyTitle}</h3>
-                <p>{copy.library.emptyDescription}</p>
+                <h3>{detailLibraryCopy.emptyTitle}</h3>
+                <p>{detailLibraryCopy.emptyDescription}</p>
               </div>
             )}
           </aside>
 
-          {selectedResult?.plant.image.src ? (
+          {selectedDetailPlant?.image.src ? (
             <div
               className={
                 isImageViewerOpen ? "image-viewer-backdrop is-open" : "image-viewer-backdrop"
@@ -3672,10 +4001,10 @@ function PlantsPage({
                 }
                 role="dialog"
                 aria-modal="true"
-                aria-label={selectedResult.plant.name}
+                aria-label={selectedDetailPlant.name}
               >
                 <div className="image-viewer-head">
-                  <strong>{selectedResult.plant.name}</strong>
+                  <strong>{selectedDetailPlant.name}</strong>
                   <div className="image-viewer-actions">
                     <button
                       type="button"
@@ -3705,8 +4034,8 @@ function PlantsPage({
                 <div className="image-viewer-canvas">
                   <img
                     className="image-viewer-image"
-                    src={selectedResult.plant.image.src}
-                    alt={selectedResult.plant.image.alt}
+                    src={selectedDetailPlant.image.src}
+                    alt={selectedDetailPlant.image.alt}
                     style={{ transform: `scale(${imageZoomLevel})` }}
                   />
                 </div>
@@ -3830,6 +4159,15 @@ export default function App() {
   const [isSignOutConfirmOpen, setIsSignOutConfirmOpen] = useState(false);
   const [isDesktopPromptOpen, setIsDesktopPromptOpen] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState(null);
+  const [installPromptCooldownUntil, setInstallPromptCooldownUntil] = useState(() =>
+    getInstallPromptCooldownUntil(),
+  );
+  const [isInstallPromptDismissedForever, setIsInstallPromptDismissedForever] = useState(() =>
+    getInstallPromptDismissedForever(),
+  );
+  const [isInstallPromptManuallyOpen, setIsInstallPromptManuallyOpen] = useState(false);
+  const [isStandaloneMode, setIsStandaloneMode] = useState(() => isStandaloneApp());
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (typeof window === "undefined") {
       return true;
@@ -3838,6 +4176,22 @@ export default function App() {
     return window.innerWidth <= MOBILE_APP_BREAKPOINT;
   });
   const copy = content[language];
+  const installPlatform = isMobileViewport ? detectInstallPlatform() : null;
+  const canTriggerNativeInstall = installPlatform === "android" && Boolean(deferredInstallPrompt);
+  const shouldAutoShowInstallPrompt =
+    Boolean(user) &&
+    page === "home" &&
+    isMobileViewport &&
+    !isStandaloneMode &&
+    !isInstallPromptDismissedForever &&
+    Date.now() >= installPromptCooldownUntil &&
+    (installPlatform === "ios" || installPlatform === "android");
+  const shouldShowInstallPrompt =
+    Boolean(user) &&
+    isMobileViewport &&
+    !isStandaloneMode &&
+    Boolean(installPlatform) &&
+    (isInstallPromptManuallyOpen || shouldAutoShowInstallPrompt);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -3924,6 +4278,54 @@ export default function App() {
       () => setFavoritePlantIds([]),
     );
   }, [user]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const handleBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setDeferredInstallPrompt(event);
+    };
+
+    const handleAppInstalled = () => {
+      setDeferredInstallPrompt(null);
+      setIsStandaloneMode(true);
+      setIsInstallPromptManuallyOpen(false);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    setIsStandaloneMode(isStandaloneApp());
+  }, [page]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || installPromptCooldownUntil <= Date.now()) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setInstallPromptCooldownUntil(0);
+      window.localStorage.removeItem(INSTALL_PROMPT_STORAGE_KEY);
+    }, installPromptCooldownUntil - Date.now());
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [installPromptCooldownUntil]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -4118,6 +4520,55 @@ export default function App() {
     }
   }
 
+  function dismissInstallPrompt() {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const nextDismissUntil = Date.now() + INSTALL_PROMPT_DISMISS_MS;
+    window.localStorage.setItem(
+      INSTALL_PROMPT_STORAGE_KEY,
+      String(nextDismissUntil),
+    );
+    setInstallPromptCooldownUntil(nextDismissUntil);
+    setIsInstallPromptManuallyOpen(false);
+  }
+
+  function dismissInstallPromptForever() {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(INSTALL_PROMPT_FOREVER_STORAGE_KEY, "true");
+    window.localStorage.removeItem(INSTALL_PROMPT_STORAGE_KEY);
+    setInstallPromptCooldownUntil(0);
+    setIsInstallPromptDismissedForever(true);
+    setIsInstallPromptManuallyOpen(false);
+  }
+
+  async function handleInstallPromptPrimaryAction() {
+    if (installPlatform === "android" && deferredInstallPrompt) {
+      const promptEvent = deferredInstallPrompt;
+      setDeferredInstallPrompt(null);
+
+      try {
+        await promptEvent.prompt();
+        await promptEvent.userChoice;
+      } catch {
+        // Ignore browser prompt failures and keep the app usable.
+      }
+
+      dismissInstallPromptForever();
+      return;
+    }
+
+    dismissInstallPromptForever();
+  }
+
+  function openInstallPromptManually() {
+    setIsInstallPromptManuallyOpen(true);
+  }
+
   if (page === "admin") {
     return (
       <div className="app-shell admin-shell">
@@ -4201,6 +4652,8 @@ export default function App() {
               user={user}
               favoriteCount={favoritePlantIds.length}
               language={language}
+              canShowInstallEntry={Boolean(installPlatform) && !isStandaloneMode}
+              onOpenInstallPrompt={openInstallPromptManually}
               onLanguageChange={setLanguage}
               onSignIn={handleSignIn}
               onSignOut={requestSignOut}
@@ -4209,6 +4662,7 @@ export default function App() {
             <PlantsPage
               copy={copy}
               language={language}
+              onLanguageChange={setLanguage}
               plants={plants}
               isLoading={plantsStatus === "loading"}
               loadError={plantsError}
@@ -4225,6 +4679,15 @@ export default function App() {
             />
           )}
         </main>
+        {shouldShowInstallPrompt ? (
+          <InstallPromptPopup
+            copy={copy}
+            platform={installPlatform}
+            canTriggerNativeInstall={canTriggerNativeInstall}
+            onLater={dismissInstallPrompt}
+            onPrimaryAction={handleInstallPromptPrimaryAction}
+          />
+        ) : null}
         <ConfirmDialog
           isOpen={isSignOutConfirmOpen}
           title={copy.confirm.signOutTitle}
