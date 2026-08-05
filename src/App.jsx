@@ -108,7 +108,8 @@ const content = {
       popularLabel: "ഏറ്റവും ജനപ്രിയം",
       exploreLabel: "തുറക്കുക",
       savedRailLabel: "കൂടുതൽ save ചെയ്ത സസ്യങ്ങൾ",
-      noPlantsLabel: "സസ്യങ്ങൾ ഉടൻ വരുന്നു",
+      loadingLabel: "പ്രധാന സസ്യത്തിന്റെ വിവരങ്ങൾ കൊണ്ടുവരുന്നു",
+      noPlantsLabel: "പ്രധാന സസ്യം ഉടൻ കാണിക്കും",
     },
     browse: {
       eyebrow: "വിഭാഗങ്ങൾ പരിശോധിക്കാം",
@@ -231,14 +232,14 @@ const content = {
       filtersCountLabel: "ഫിൽട്ടറുകൾ",
       activeFilterLabel: "ഫിൽട്ടർ സജീവമാണ്",
       activeFiltersLabel: "ഫിൽട്ടറുകൾ സജീവമാണ്",
-      backToResultsLabel: "ഫലങ്ങളിലേക്ക് മടങ്ങുക",
-      backToSavedLabel: "സേവ് ചെയ്ത സസ്യങ്ങളിലേക്ക് മടങ്ങുക",
-      nextPlantLabel: "അടുത്ത സസ്യം",
+      backToResultsLabel: "മടങ്ങുക",
+      backToSavedLabel: "മടങ്ങുക",
+      nextPlantLabel: "അടുത്തത്",
       emptyTitle: "ഫലങ്ങൾ ലഭിച്ചില്ല",
       emptyDescription:
         "മറ്റൊരു spelling ശ്രമിക്കുകയോ filters clear ചെയ്യുകയോ ചെയ്യൂ. വലിയ dataset-ലും തിരച്ചിൽ സഹായിക്കാൻ ഈ പേജ് query-based filtering ഉപയോഗിക്കുന്നു.",
       loadingTitle: "സസ്യങ്ങൾ ലോഡ് ചെയ്യുന്നു",
-      loadingDescription: "Firestore-ൽ നിന്ന് ഔഷധസസ്യങ്ങൾ കൊണ്ടുവരുന്നു.",
+      loadingDescription: "ഔഷധസസ്യങ്ങളുടെ വിവരങ്ങൾ കൊണ്ടുവരുന്നു.",
       errorTitle: "ഡാറ്റ ലഭ്യമാക്കാനായില്ല",
       errorDescription: "Firestore connection വീണ്ടും പരിശോധിച്ച് കുറച്ച് നേരം കഴിഞ്ഞ് ശ്രമിക്കൂ.",
       noCatalogTitle: "ഇനിയും സസ്യങ്ങൾ ചേർത്തിട്ടില്ല",
@@ -305,7 +306,8 @@ const content = {
       popularLabel: "Most popular",
       exploreLabel: "Open plant",
       savedRailLabel: "More saved plants",
-      noPlantsLabel: "Plants coming soon",
+      loadingLabel: "Loading featured plant details",
+      noPlantsLabel: "Featured plant will appear here soon",
     },
     browse: {
       eyebrow: "Explore the directory",
@@ -429,14 +431,14 @@ const content = {
       filtersCountLabel: "filters",
       activeFilterLabel: "active filter",
       activeFiltersLabel: "active filters",
-      backToResultsLabel: "Back to results",
-      backToSavedLabel: "Back to saved plants",
-      nextPlantLabel: "Next plant",
+      backToResultsLabel: "Back",
+      backToSavedLabel: "Back",
+      nextPlantLabel: "Next",
       emptyTitle: "No matching plants found",
       emptyDescription:
         "Try another spelling or clear your filters. The catalog search is designed to support larger datasets with layered filtering.",
       loadingTitle: "Loading plants",
-      loadingDescription: "Fetching medicinal plant records from Firestore.",
+      loadingDescription: "Fetching medicinal plant details.",
       errorTitle: "Could not load the catalog",
       errorDescription: "Check the Firestore connection and try again.",
       noCatalogTitle: "No plants added yet",
@@ -2882,7 +2884,7 @@ function DesktopLanding({ isPromptOpen, onOpenPrompt, onClosePrompt, isScrolled 
   );
 }
 
-function Hero({ copy, language, plants, onSearchSubmit, onPlantOpen }) {
+function Hero({ copy, language, plants, isLoading, onSearchSubmit, onPlantOpen }) {
   const [query, setQuery] = useState("");
   const localizedPlants = plants.map((plant) => ({
     localized: localizePlant(plant, language),
@@ -2979,7 +2981,9 @@ function Hero({ copy, language, plants, onSearchSubmit, onPlantOpen }) {
             ) : null}
           </>
         ) : (
-          <div className="hero-highlight-empty">{copy.featured.noPlantsLabel}</div>
+          <div className="hero-highlight-empty">
+            {isLoading ? copy.featured.loadingLabel : copy.featured.noPlantsLabel}
+          </div>
         )}
       </aside>
     </section>
@@ -3048,16 +3052,17 @@ function StatsSection({ copy, plants }) {
   );
 }
 
-function HomePage({ copy, language, plants, onSearchSubmit, onBrowseOpen, onPlantOpen }) {
+function HomePage({ copy, language, plants, isLoading, onSearchSubmit, onBrowseOpen, onPlantOpen }) {
   return (
     <>
-      <Hero
-        copy={copy}
-        language={language}
-        plants={plants}
-        onSearchSubmit={onSearchSubmit}
-        onPlantOpen={onPlantOpen}
-      />
+        <Hero
+          copy={copy}
+          language={language}
+          plants={plants}
+          isLoading={isLoading}
+          onSearchSubmit={onSearchSubmit}
+          onPlantOpen={onPlantOpen}
+        />
       <CardGridSection
         id="browse"
         eyebrow={copy.browse.eyebrow}
@@ -3273,6 +3278,7 @@ function PlantsPage({
   const selectedDetailPlant = selectedPlantRecord
     ? localizePlant(selectedPlantRecord, detailLanguage)
     : null;
+  const isDetailPlantLoading = isLoading && Boolean(selectedPlantSlug);
   const isMalayalam = detailLanguage === "ml";
   const nextLanguage = isMalayalam ? "en" : "ml";
   const nextLanguageLabel = detailCopy.languageOptions[nextLanguage];
@@ -3688,7 +3694,7 @@ function PlantsPage({
                 : undefined
             }
           >
-            {selectedResult && selectedDetailPlant ? (
+            {selectedDetailPlant ? (
               <>
                 <div className="detail-header-row">
                   <h3>{selectedDetailPlant.name}</h3>
@@ -3974,6 +3980,11 @@ function PlantsPage({
 
                 <BuyMeACoffeeButton />
               </>
+            ) : isDetailPlantLoading ? (
+              <div className="empty-state-card is-detail">
+                <h3>{detailLibraryCopy.loadingTitle}</h3>
+                <p>{detailLibraryCopy.loadingDescription}</p>
+              </div>
             ) : (
               <div className="empty-state-card is-detail">
                 <h3>{detailLibraryCopy.emptyTitle}</h3>
@@ -4632,6 +4643,7 @@ export default function App() {
               copy={copy}
               language={language}
               plants={plants}
+              isLoading={plantsStatus === "loading"}
               onSearchSubmit={handleCatalogSearch}
               onBrowseOpen={handleBrowseOpen}
               onPlantOpen={(plant) => handleCatalogSearch(plant.query, plant.slug)}

@@ -3420,6 +3420,10 @@ main {
     opacity: 0;
     pointer-events: none;
   }
+
+  body.detail-open .plant-detail-card {
+    padding-bottom: calc(1.2rem + env(safe-area-inset-bottom));
+  }
 }
 
 @media (max-width: 520px) {
