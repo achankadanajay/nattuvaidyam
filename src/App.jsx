@@ -21,6 +21,10 @@ const LANGUAGE_STORAGE_KEY = "nattuvaidyam-language";
 const INSTALL_PROMPT_STORAGE_KEY = "nattuvaidyam-install-prompt-dismissed-until-v3";
 const INSTALL_PROMPT_FOREVER_STORAGE_KEY = "nattuvaidyam-install-prompt-dismissed-forever-v3";
 const INSTALL_PROMPT_DISMISS_MS = 15 * 24 * 60 * 60 * 1000;
+const SITE_URL = "https://nattuvaidyam.in";
+const DEFAULT_SEO_DESCRIPTION =
+  "Search Kerala medicinal plants by name, symptom, disease, and traditional remedy.";
+const DEFAULT_OG_IMAGE = `${SITE_URL}/medlogo.png?v=20260802a`;
 
 function getInstallPromptCooldownUntil() {
   if (typeof window === "undefined") {
@@ -671,6 +675,157 @@ function buildAppUrl({
 
   url.hash = "";
   return `${url.origin}${url.pathname}${url.search}`;
+}
+
+function buildCanonicalUrl({ language, page, plantSlug = null, adminSection = "home", detailOpen = false }) {
+  const url = new URL(SITE_URL);
+
+  if (page === "admin") {
+    url.pathname =
+      adminSection === "new"
+        ? "/admin/new"
+        : adminSection === "edit"
+          ? "/admin/edit"
+          : "/admin";
+  } else if (page === "saved") {
+    url.pathname = "/saved";
+  } else if (page === "me") {
+    url.pathname = "/me";
+  } else if (page === "plants") {
+    url.pathname =
+      detailOpen && plantSlug ? `/plants/${encodeURIComponent(plantSlug)}` : "/search";
+  } else {
+    url.pathname = "/";
+  }
+
+  if (language === "ml") {
+    url.searchParams.set("lang", "ml");
+  }
+
+  return `${url.origin}${url.pathname}${url.search}`;
+}
+
+function truncateText(text, maxLength = 160) {
+  const normalizedText = (text ?? "").trim().replace(/\s+/g, " ");
+
+  if (!normalizedText || normalizedText.length <= maxLength) {
+    return normalizedText;
+  }
+
+  return `${normalizedText.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+function toAbsoluteUrl(url) {
+  if (!url) {
+    return DEFAULT_OG_IMAGE;
+  }
+
+  try {
+    return new URL(url, SITE_URL).toString();
+  } catch {
+    return DEFAULT_OG_IMAGE;
+  }
+}
+
+function setMetaTag(selector, value, attribute = "content") {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const element = document.querySelector(selector);
+  if (!element) {
+    return;
+  }
+
+  element.setAttribute(attribute, value);
+}
+
+function buildStructuredData({ title, description, canonicalUrl, localizedPlant }) {
+  const webPage = {
+    "@type": "WebPage",
+    "@id": `${canonicalUrl}#webpage`,
+    url: canonicalUrl,
+    name: title,
+    description,
+    isPartOf: {
+      "@id": `${SITE_URL}/#website`,
+    },
+  };
+
+  if (!localizedPlant) {
+    return {
+      "@context": "https://schema.org",
+      "@graph": [webPage],
+    };
+  }
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        ...webPage,
+        about: {
+          "@id": `${canonicalUrl}#plant`,
+        },
+        breadcrumb: {
+          "@id": `${canonicalUrl}#breadcrumb`,
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        "@id": `${canonicalUrl}#breadcrumb`,
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "Home",
+            item: SITE_URL,
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: "Medicinal plants",
+            item: `${SITE_URL}/search`,
+          },
+          {
+            "@type": "ListItem",
+            position: 3,
+            name: localizedPlant.name,
+            item: canonicalUrl,
+          },
+        ],
+      },
+      {
+        "@type": "Thing",
+        "@id": `${canonicalUrl}#plant`,
+        name: localizedPlant.name,
+        description,
+        url: canonicalUrl,
+        image: toAbsoluteUrl(localizedPlant.image?.src),
+        alternateName: localizedPlant.aliases?.slice(0, 8) ?? [],
+        additionalProperty: localizedPlant.family
+          ? [
+              {
+                "@type": "PropertyValue",
+                name: "Family",
+                value: localizedPlant.family,
+              },
+              {
+                "@type": "PropertyValue",
+                name: "Scientific name",
+                value: localizedPlant.scientific,
+              },
+            ]
+          : [
+              {
+                "@type": "PropertyValue",
+                name: "Scientific name",
+                value: localizedPlant.scientific,
+              },
+            ],
+      },
+    ],
+  };
 }
 
 function createEmptyAliasRow() {
@@ -4187,6 +4342,10 @@ export default function App() {
     return window.innerWidth <= MOBILE_APP_BREAKPOINT;
   });
   const copy = content[language];
+  const selectedPlantRecord = plants.find((plant) => plant.id === selectedPlantSlug) ?? null;
+  const localizedSelectedPlant = selectedPlantRecord
+    ? localizePlant(selectedPlantRecord, language)
+    : null;
   const installPlatform = isMobileViewport ? detectInstallPlatform() : null;
   const canTriggerNativeInstall = installPlatform === "android" && Boolean(deferredInstallPrompt);
   const shouldAutoShowInstallPrompt =
@@ -4405,6 +4564,108 @@ export default function App() {
 
     window.history.replaceState({}, "", nextUrl);
   }, [adminSection, catalogSeed.query, isPlantsDetailRouteOpen, language, page, selectedPlantSlug]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const canonicalUrl = buildCanonicalUrl({
+      language,
+      page,
+      plantSlug: page === "plants" ? selectedPlantSlug : null,
+      adminSection,
+      detailOpen: page === "plants" ? isPlantsDetailRouteOpen : false,
+    });
+    const trimmedQuery = catalogSeed.query.trim();
+    const isPlantDetailPage =
+      page === "plants" && Boolean(isPlantsDetailRouteOpen && localizedSelectedPlant);
+    const pageTitleBase = "Nattuvaidyam";
+    let title = `${pageTitleBase} | Medicinal Plants`;
+    let description = DEFAULT_SEO_DESCRIPTION;
+    let robots = "index,follow";
+
+    if (page === "home") {
+      title = "Nattuvaidyam | Kerala Medicinal Plants";
+      description = DEFAULT_SEO_DESCRIPTION;
+    } else if (page === "plants" && isPlantDetailPage) {
+      title = `${localizedSelectedPlant.name} | ${pageTitleBase}`;
+      description = truncateText(
+        localizedSelectedPlant.summary ||
+          localizedSelectedPlant.overview ||
+          `${localizedSelectedPlant.name} medicinal plant details, traditional uses, and remedies.`,
+      );
+    } else if (page === "plants" && trimmedQuery) {
+      title = `${trimmedQuery} | Plant Search | ${pageTitleBase}`;
+      description = truncateText(
+        `Search medicinal plants related to ${trimmedQuery} on Nattuvaidyam.`,
+      );
+      robots = "noindex,follow";
+    } else if (page === "plants") {
+      title = `Search Medicinal Plants | ${pageTitleBase}`;
+      description = "Browse and search Kerala medicinal plants by name, symptom, disease, and remedy.";
+    } else if (page === "saved") {
+      title = `Saved Plants | ${pageTitleBase}`;
+      description = "Your saved medicinal plants on Nattuvaidyam.";
+      robots = "noindex,follow";
+    } else if (page === "me") {
+      title = `My Account | ${pageTitleBase}`;
+      description = "Manage your Nattuvaidyam account, language, and install settings.";
+      robots = "noindex,follow";
+    } else if (page === "admin") {
+      title = `Admin | ${pageTitleBase}`;
+      description = "Plant management for Nattuvaidyam.";
+      robots = "noindex,nofollow";
+    }
+
+    document.title = title;
+    document.documentElement.lang = language === "ml" ? "ml" : "en";
+    setMetaTag('meta[name="description"]', description);
+    setMetaTag('meta[name="robots"]', robots);
+    setMetaTag('meta[property="og:title"]', title);
+    setMetaTag('meta[property="og:description"]', description);
+    setMetaTag('meta[property="og:url"]', canonicalUrl);
+    setMetaTag('meta[property="og:type"]', isPlantDetailPage ? "article" : "website");
+    setMetaTag('meta[property="og:image"]', toAbsoluteUrl(localizedSelectedPlant?.image?.src));
+    setMetaTag(
+      'meta[property="og:image:secure_url"]',
+      toAbsoluteUrl(localizedSelectedPlant?.image?.src),
+    );
+    setMetaTag(
+      'meta[property="og:image:alt"]',
+      localizedSelectedPlant?.image?.alt ||
+        "Nattuvaidyam logo with mortar, pestle, and medicinal leaves",
+    );
+    setMetaTag('meta[name="twitter:title"]', title);
+    setMetaTag('meta[name="twitter:description"]', description);
+    setMetaTag('meta[name="twitter:image"]', toAbsoluteUrl(localizedSelectedPlant?.image?.src));
+    setMetaTag(
+      'meta[name="twitter:image:alt"]',
+      localizedSelectedPlant?.image?.alt ||
+        "Nattuvaidyam logo with mortar, pestle, and medicinal leaves",
+    );
+    setMetaTag('link[rel="canonical"]', canonicalUrl, "href");
+
+    const structuredDataElement = document.getElementById("dynamic-structured-data");
+    if (structuredDataElement) {
+      structuredDataElement.textContent = JSON.stringify(
+        buildStructuredData({
+          title,
+          description,
+          canonicalUrl,
+          localizedPlant: isPlantDetailPage ? localizedSelectedPlant : null,
+        }),
+      );
+    }
+  }, [
+    adminSection,
+    catalogSeed.query,
+    isPlantsDetailRouteOpen,
+    language,
+    localizedSelectedPlant,
+    page,
+    selectedPlantSlug,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
