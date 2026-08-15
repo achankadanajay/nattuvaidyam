@@ -2751,7 +2751,7 @@ function PlantUpdatesPreferenceCard({
 }) {
   const isEnabled = Boolean(preference?.enabled);
   const permission = preference?.permission ?? capability.permission;
-  const canToggle = capability.state === "ready";
+  const canToggle = capability.state === "ready" || isEnabled;
   let helperText = copy.me.plantUpdatesNote;
   let statusLabel = isEnabled
     ? copy.me.plantUpdatesEnabled
@@ -5096,6 +5096,25 @@ export default function App() {
       return;
     }
 
+    if (plantUpdatesPreference?.enabled) {
+      setPlantUpdatesPending(true);
+      setPlantUpdatesError("");
+
+      try {
+        await disablePlantUpdates(user.uid);
+      } catch (error) {
+        setPlantUpdatesError(
+          error instanceof Error && error.message
+            ? error.message
+            : "Could not update plant notifications right now.",
+        );
+      } finally {
+        setPlantUpdatesPending(false);
+      }
+
+      return;
+    }
+
     if (plantUpdatesCapability.state === "install-required") {
       openInstallPromptManually();
       return;
@@ -5114,17 +5133,13 @@ export default function App() {
     setPlantUpdatesError("");
 
     try {
-      if (plantUpdatesPreference?.enabled) {
-        await disablePlantUpdates(user.uid);
-      } else {
-        const result = await enablePlantUpdates({
-          userId: user.uid,
-          language,
-        });
+      const result = await enablePlantUpdates({
+        userId: user.uid,
+        language,
+      });
 
-        if (result.permission !== "granted") {
-          setPlantUpdatesError(copy.me.plantUpdatesDenied);
-        }
+      if (result.permission !== "granted") {
+        setPlantUpdatesError(copy.me.plantUpdatesDenied);
       }
     } catch (error) {
       setPlantUpdatesError(
