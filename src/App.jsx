@@ -196,6 +196,10 @@ const content = {
       plantUpdatesNotConfigured: "Push notifications ഇനിയും ക്രമീകരിച്ചിട്ടില്ല.",
       plantUpdatesOnLabel: "ഓൺ",
       plantUpdatesOffLabel: "ഓഫ്",
+      malayalamComingSoonTitle: "Malayalam is coming soon",
+      malayalamComingSoonMessage:
+        "We are still refining the Malayalam translation. For now, this section is available only in English.",
+      malayalamComingSoonAction: "OK",
       languageChoices: {
         en: "English",
         ml: "Malayalam",
@@ -410,6 +414,10 @@ const content = {
       plantUpdatesNotConfigured: "Push notifications are not configured yet.",
       plantUpdatesOnLabel: "On",
       plantUpdatesOffLabel: "Off",
+      malayalamComingSoonTitle: "Malayalam is coming soon",
+      malayalamComingSoonMessage:
+        "We are still refining the Malayalam translation. For now, this section is available only in English.",
+      malayalamComingSoonAction: "OK",
       languageChoices: {
         en: "English",
         ml: "Malayalam",
@@ -1418,6 +1426,34 @@ function ConfirmDialog({
             onClick={() => void onConfirm()}
           >
             {confirmLabel}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function NoticeDialog({ isOpen, title, description, actionLabel, onClose }) {
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div className="confirm-dialog-backdrop" onClick={onClose}>
+      <section
+        className="confirm-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="confirm-dialog-copy">
+          <h3>{title}</h3>
+          {description ? <p>{description}</p> : null}
+        </div>
+        <div className="confirm-dialog-actions is-single">
+          <button type="button" className="confirm-dialog-button" onClick={onClose}>
+            {actionLabel}
           </button>
         </div>
       </section>
@@ -2829,6 +2865,7 @@ function MePage({
   onOpenInstallPrompt,
   onTogglePlantUpdates,
   onLanguageChange,
+  onRequestMalayalam,
   onSignIn,
   onSignOut,
 }) {
@@ -2873,7 +2910,9 @@ function MePage({
                   role="switch"
                   aria-checked={isMalayalam}
                   aria-label={`${copy.me.languageLabel}: ${copy.me.languageChoices[language]}`}
-                  onClick={() => onLanguageChange(nextLanguage)}
+                  onClick={() =>
+                    nextLanguage === "ml" ? onRequestMalayalam() : onLanguageChange(nextLanguage)
+                  }
                 >
                   <span
                     className={!isMalayalam ? "account-language-option is-selected" : "account-language-option"}
@@ -3394,6 +3433,7 @@ function PlantsPage({
   detailEntrySource,
   onReturnToSource,
   onDetailStateChange,
+  onRequestMalayalam,
 }) {
   const DETAIL_SWIPE_THRESHOLD = 88;
   const localizedPlants = plants.map((plant) => localizePlant(plant, language));
@@ -4024,7 +4064,11 @@ function PlantsPage({
                       className="detail-language-button"
                       aria-label={`${detailCopy.me.languageLabel}: ${detailCopy.me.languageChoices[nextLanguage]}`}
                       title={detailCopy.me.languageChoices[nextLanguage]}
-                      onClick={() => setDetailLanguageOverride(nextLanguage)}
+                      onClick={() =>
+                        nextLanguage === "ml"
+                          ? onRequestMalayalam()
+                          : setDetailLanguageOverride(nextLanguage)
+                      }
                     >
                       {nextLanguageLabel}
                     </button>
@@ -4514,6 +4558,7 @@ export default function App() {
   const [plantUpdatesPreference, setPlantUpdatesPreference] = useState(null);
   const [plantUpdatesPending, setPlantUpdatesPending] = useState(false);
   const [plantUpdatesError, setPlantUpdatesError] = useState("");
+  const [isMalayalamNoticeOpen, setIsMalayalamNoticeOpen] = useState(false);
   const [isStandaloneMode, setIsStandaloneMode] = useState(() => isStandaloneApp());
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (typeof window === "undefined") {
@@ -5083,6 +5128,10 @@ export default function App() {
     setIsInstallPromptManuallyOpen(true);
   }
 
+  function openMalayalamNotice() {
+    setIsMalayalamNoticeOpen(true);
+  }
+
   async function handleTogglePlantUpdates() {
     if (!user || !plantUpdatesCapability) {
       return;
@@ -5236,6 +5285,7 @@ export default function App() {
               onOpenInstallPrompt={openInstallPromptManually}
               onTogglePlantUpdates={handleTogglePlantUpdates}
               onLanguageChange={setLanguage}
+              onRequestMalayalam={openMalayalamNotice}
               onSignIn={handleSignIn}
               onSignOut={requestSignOut}
             />
@@ -5243,7 +5293,6 @@ export default function App() {
             <PlantsPage
               copy={copy}
               language={language}
-              onLanguageChange={setLanguage}
               plants={plants}
               isLoading={plantsStatus === "loading"}
               loadError={plantsError}
@@ -5257,6 +5306,7 @@ export default function App() {
               detailEntrySource={plantsDetailSource}
               onReturnToSource={handleReturnFromPlantDetail}
               onDetailStateChange={setIsPlantsDetailRouteOpen}
+              onRequestMalayalam={openMalayalamNotice}
             />
           )}
         </main>
@@ -5278,6 +5328,13 @@ export default function App() {
           onConfirm={handleSignOut}
           onCancel={() => setIsSignOutConfirmOpen(false)}
           isDestructive
+        />
+        <NoticeDialog
+          isOpen={isMalayalamNoticeOpen}
+          title={copy.me.malayalamComingSoonTitle}
+          description={copy.me.malayalamComingSoonMessage}
+          actionLabel={copy.me.malayalamComingSoonAction}
+          onClose={() => setIsMalayalamNoticeOpen(false)}
         />
       </div>
       <MobileNav copy={copy} page={page} onNavigate={handleNavigate} />

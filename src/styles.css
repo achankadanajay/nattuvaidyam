@@ -2471,6 +2471,10 @@ main {
   gap: 0.7rem;
 }
 
+.confirm-dialog-actions.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .confirm-dialog-button {
   border: 0;
   border-radius: 1rem;
