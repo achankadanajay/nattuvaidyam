@@ -1,0 +1,60 @@
+name: Test Phone Notification
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_user_id:
+        description: Firebase Auth user ID of the phone to test
+        required: true
+        type: string
+      title:
+        description: Notification title
+        required: false
+        default: Nattuvaidyam test
+        type: string
+      body:
+        description: Notification body
+        required: false
+        default: This is a manual push test from GitHub Actions.
+        type: string
+      path:
+        description: App path to open when the notification is tapped
+        required: false
+        default: /me
+        type: string
+
+concurrency:
+  group: test-phone-notification
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Send manual test notification
+        run: npm run send:test-notification
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          WEB_PUSH_PUBLIC_KEY: ${{ secrets.WEB_PUSH_PUBLIC_KEY }}
+          WEB_PUSH_PRIVATE_KEY: ${{ secrets.WEB_PUSH_PRIVATE_KEY }}
+          WEB_PUSH_CONTACT_EMAIL: ${{ vars.WEB_PUSH_CONTACT_EMAIL }}
+          PLANT_UPDATES_APP_ORIGIN: ${{ vars.PLANT_UPDATES_APP_ORIGIN }}
+          TEST_NOTIFICATION_TARGET_UID: ${{ inputs.target_user_id }}
+          TEST_NOTIFICATION_TITLE: ${{ inputs.title }}
+          TEST_NOTIFICATION_BODY: ${{ inputs.body }}
+          TEST_NOTIFICATION_PATH: ${{ inputs.path }}
