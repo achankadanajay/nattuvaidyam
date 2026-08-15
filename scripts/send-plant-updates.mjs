@@ -1,4 +1,5 @@
-import admin from "firebase-admin";
+import { cert, initializeApp } from "firebase-admin/app";
+import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import webpush from "web-push";
 
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
@@ -177,13 +178,13 @@ async function main() {
   const contactEmail = process.env.WEB_PUSH_CONTACT_EMAIL?.trim() || DEFAULT_CONTACT;
   const isDryRun = parseBooleanEnv("PLANT_UPDATES_DRY_RUN");
 
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
+  initializeApp({
+    credential: cert(serviceAccount),
   });
 
   webpush.setVapidDetails(contactEmail, webPushPublicKey, webPushPrivateKey);
 
-  const db = admin.firestore();
+  const db = getFirestore();
   const summary = createSummaryTracker();
   const now = Date.now();
 
@@ -225,7 +226,7 @@ async function main() {
               enabled: false,
               subscription: null,
               lastError: "Missing or invalid push subscription.",
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
             },
           },
           { merge: true },
@@ -279,16 +280,16 @@ async function main() {
 
       await userSnapshot.ref.set(
         {
-          plantUpdates: {
-            lastSentPlantId: plant.id,
-            lastSentAt: admin.firestore.FieldValue.serverTimestamp(),
-            nextPlantOrder: nextPlantOrder + 1,
-            nextSendAt: admin.firestore.Timestamp.fromMillis(now + THREE_DAYS_MS),
-            lastError: admin.firestore.FieldValue.delete(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            plantUpdates: {
+              lastSentPlantId: plant.id,
+              lastSentAt: FieldValue.serverTimestamp(),
+              nextPlantOrder: nextPlantOrder + 1,
+              nextSendAt: Timestamp.fromMillis(now + THREE_DAYS_MS),
+              lastError: FieldValue.delete(),
+              updatedAt: FieldValue.serverTimestamp(),
+            },
           },
-        },
-        { merge: true },
+          { merge: true },
       );
 
       summary.sent += 1;
@@ -309,7 +310,7 @@ async function main() {
               enabled: false,
               subscription: null,
               lastError: `Push subscription expired: ${message}`,
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
             },
           },
           { merge: true },
@@ -327,7 +328,7 @@ async function main() {
         {
           plantUpdates: {
             lastError: message,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
           },
         },
         { merge: true },
