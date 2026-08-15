@@ -8,7 +8,10 @@ import {
 import { db } from "./firebase";
 
 const PLANT_UPDATES_CADENCE_DAYS = 3;
-const WEB_PUSH_PUBLIC_KEY = import.meta.env.VITE_WEB_PUSH_PUBLIC_KEY ?? "";
+const DEFAULT_WEB_PUSH_PUBLIC_KEY =
+  "BKIN_cqNrk80zYHsGGhHHFW78KR7t63Mzq-qIR79RrUkqvHqtHhXY8egm5Uy4vRrr0visSJq4fDLt8IymSTcnjM";
+const WEB_PUSH_PUBLIC_KEY =
+  import.meta.env.VITE_WEB_PUSH_PUBLIC_KEY?.trim() || DEFAULT_WEB_PUSH_PUBLIC_KEY;
 
 function getUserDoc(userId) {
   return doc(db, "users", userId);
