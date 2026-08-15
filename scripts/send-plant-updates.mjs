@@ -72,6 +72,75 @@ function truncateText(value, maxLength = 140) {
   return `${text.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
+function getLocalizedList(value, language) {
+  const items = value?.[language];
+
+  return Array.isArray(items)
+    ? items.map((item) => String(item ?? "").trim()).filter(Boolean)
+    : [];
+}
+
+function joinUses(items, language) {
+  const cleanedItems = items.slice(0, 3);
+
+  if (!cleanedItems.length) {
+    return "";
+  }
+
+  if (language === "ml") {
+    if (cleanedItems.length === 1) {
+      return cleanedItems[0];
+    }
+
+    if (cleanedItems.length === 2) {
+      return `${cleanedItems[0]}, ${cleanedItems[1]}`;
+    }
+
+    return `${cleanedItems[0]}, ${cleanedItems[1]}, ${cleanedItems[2]}`;
+  }
+
+  if (cleanedItems.length === 1) {
+    return cleanedItems[0];
+  }
+
+  if (cleanedItems.length === 2) {
+    return `${cleanedItems[0]} and ${cleanedItems[1]}`;
+  }
+
+  return `${cleanedItems.slice(0, -1).join(", ")}, and ${cleanedItems.at(-1)}`;
+}
+
+function buildNotificationBody(plant, language) {
+  const uses = getLocalizedList(plant.medicinal_uses, language);
+  const summary = truncateText(getPlantSummary(plant, language), 92);
+
+  if (uses.length) {
+    if (language === "ml") {
+      return truncateText(
+        `പരമ്പരാഗതമായി ${joinUses(uses, language)} എന്നിവയ്ക്ക് ഉപയോഗിക്കുന്നു. കൂടുതൽ അറിയാൻ തട്ടുക.`,
+        140,
+      );
+    }
+
+    return truncateText(
+      `Traditionally used for ${joinUses(uses, language)}. Tap to know more.`,
+      140,
+    );
+  }
+
+  if (summary) {
+    if (language === "ml") {
+      return truncateText(`${summary} കൂടുതൽ അറിയാൻ തട്ടുക.`, 140);
+    }
+
+    return truncateText(`${summary} Tap to know more.`, 140);
+  }
+
+  return language === "ml"
+    ? "കൂടുതൽ അറിയാൻ തട്ടുക."
+    : "Tap to know more.";
+}
+
 function getNotificationOrder(plant) {
   return Number.isFinite(plant.notificationOrder) ? plant.notificationOrder : null;
 }
@@ -143,7 +212,6 @@ function getTimestampMillis(value) {
 
 function buildNotificationPayload({ plant, language, appOrigin }) {
   const title = getPlantName(plant, language);
-  const summary = truncateText(getPlantSummary(plant, language), 140);
   const iconUrl = new URL(
     "/favicon/web-app-manifest-192x192.png?v=20260802a",
     appOrigin,
@@ -152,7 +220,7 @@ function buildNotificationPayload({ plant, language, appOrigin }) {
 
   return {
     title,
-    body: summary || plant.scientific_name || "Tap to open the plant details.",
+    body: buildNotificationBody(plant, language),
     icon: iconUrl,
     badge: iconUrl,
     url: plantUrl,
