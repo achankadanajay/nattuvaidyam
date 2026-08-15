@@ -581,8 +581,8 @@ const navIcons = {
   me: "◎",
 };
 
-function getInitialAppState() {
-  if (typeof window === "undefined") {
+function getInitialAppStateForUrl(urlString = null) {
+  if (typeof window === "undefined" && !urlString) {
     return {
       language: "en",
       page: "home",
@@ -593,7 +593,9 @@ function getInitialAppState() {
     };
   }
 
-  const url = new URL(window.location.href);
+  const url = new URL(
+    urlString || (typeof window !== "undefined" ? window.location.href : "https://nattuvaidyam.in/"),
+  );
   const pathname = url.pathname.replace(/\/+$/, "") || "/";
   const segments = pathname
     .split("/")
@@ -601,7 +603,9 @@ function getInitialAppState() {
     .map((segment) => decodeURIComponent(segment));
   const params = url.searchParams;
   const storedLanguage =
-    window.localStorage.getItem(LANGUAGE_STORAGE_KEY) === "ml" ? "ml" : "en";
+    typeof window !== "undefined" && window.localStorage.getItem(LANGUAGE_STORAGE_KEY) === "ml"
+      ? "ml"
+      : "en";
   const language = params.has("lang")
     ? params.get("lang") === "ml"
       ? "ml"
@@ -667,6 +671,10 @@ function getInitialAppState() {
     selectedPlantSlug,
     plantDetailOpen,
   };
+}
+
+function getInitialAppState() {
+  return getInitialAppStateForUrl();
 }
 
 function buildAppUrl({
@@ -4550,6 +4558,16 @@ export default function App() {
     Boolean(installPlatform) &&
     (isInstallPromptManuallyOpen || shouldAutoShowInstallPrompt);
 
+  const applyAppState = (nextState) => {
+    setLanguage(nextState.language);
+    setPage(nextState.page);
+    setAdminSection(nextState.adminSection);
+    setCatalogSeed(nextState.catalogSeed);
+    setSelectedPlantSlug(nextState.selectedPlantSlug);
+    setPlantsDetailSource("plants");
+    setIsPlantsDetailRouteOpen(nextState.plantDetailOpen);
+  };
+
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -4889,19 +4907,35 @@ export default function App() {
     }
 
     const handlePopState = () => {
-      const nextState = getInitialAppState();
-      setLanguage(nextState.language);
-      setPage(nextState.page);
-      setAdminSection(nextState.adminSection);
-      setCatalogSeed(nextState.catalogSeed);
-      setSelectedPlantSlug(nextState.selectedPlantSlug);
-      setPlantsDetailSource("plants");
-      setIsPlantsDetailRouteOpen(nextState.plantDetailOpen);
+      applyAppState(getInitialAppState());
     };
 
     window.addEventListener("popstate", handlePopState);
     return () => {
       window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.serviceWorker) {
+      return undefined;
+    }
+
+    const handleServiceWorkerMessage = (event) => {
+      const data = event.data;
+
+      if (!data || data.type !== "notification-open" || !data.url) {
+        return;
+      }
+
+      const nextState = getInitialAppStateForUrl(data.url);
+      window.history.replaceState({}, "", data.url);
+      applyAppState(nextState);
+    };
+
+    navigator.serviceWorker.addEventListener("message", handleServiceWorkerMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", handleServiceWorkerMessage);
     };
   }, []);
 

@@ -57,8 +57,18 @@ self.addEventListener("notificationclick", (event) => {
           continue;
         }
 
+        client.postMessage({
+          type: "notification-open",
+          url: targetUrl,
+          plantId: event.notification.data?.plantId || null,
+        });
+
         if ("navigate" in client) {
-          await client.navigate(targetUrl);
+          try {
+            await client.navigate(targetUrl);
+          } catch {
+            // Some PWA clients ignore navigate(); the app also handles the message directly.
+          }
         }
 
         await client.focus();
