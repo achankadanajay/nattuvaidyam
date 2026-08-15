@@ -2,6 +2,13 @@ import { onAuthStateChanged } from "firebase/auth";
 import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { auth, signInWithGoogle, signOutUser } from "./lib/firebase";
 import {
+  disablePlantUpdates,
+  enablePlantUpdates,
+  getPlantUpdatesCapability,
+  syncPlantUpdatesLanguage,
+  watchPlantUpdatesPreference,
+} from "./lib/plantUpdates";
+import {
   deletePlantRecord,
   fetchPlantsFromFirestore,
   getSearchResult,
@@ -177,6 +184,18 @@ const content = {
       installLabel: "ആപ്പ് ഇൻസ്റ്റാൾ",
       installNote: "ഓട്ടോമാറ്റിക് popup അടച്ചാലും ഇവിടെ നിന്ന് install guide വീണ്ടും തുറക്കാം.",
       installAction: "Install guide",
+      plantUpdatesLabel: "സസ്യ അപ്ഡേറ്റുകൾ",
+      plantUpdatesNote: "മൂന്ന് ദിവസത്തിൽ ഒരിക്കൽ ഒരു ഔഷധസസ്യത്തെ കുറിച്ചുള്ള അറിയിപ്പ് ലഭിക്കും.",
+      plantUpdatesEnabled: "അപ്ഡേറ്റുകൾ ഓണാണ്",
+      plantUpdatesDisabled: "അപ്ഡേറ്റുകൾ ഓഫ് ആണ്",
+      plantUpdatesEveryThreeDays: "ഓരോ 3 ദിവസത്തിലും",
+      plantUpdatesInstallFirst: "ഈ അറിയിപ്പുകൾ ലഭിക്കാൻ ആദ്യം ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യൂ.",
+      plantUpdatesUnsupported: "ഈ ഉപകരണത്തിൽ web push notifications ലഭ്യമല്ല.",
+      plantUpdatesDenied:
+        "Notifications block ചെയ്തിരിക്കുന്നു. browser settings-ൽ notifications allow ചെയ്താൽ വീണ്ടും ഓൺ ചെയ്യാം.",
+      plantUpdatesNotConfigured: "Push notifications ഇനിയും ക്രമീകരിച്ചിട്ടില്ല.",
+      plantUpdatesOnLabel: "ഓൺ",
+      plantUpdatesOffLabel: "ഓഫ്",
       languageChoices: {
         en: "English",
         ml: "Malayalam",
@@ -238,12 +257,16 @@ const content = {
       activeFiltersLabel: "ഫിൽട്ടറുകൾ സജീവമാണ്",
       backToResultsLabel: "മടങ്ങുക",
       backToSavedLabel: "മടങ്ങുക",
+      browsePlantsLabel: "സസ്യങ്ങൾ കാണുക",
       nextPlantLabel: "അടുത്തത്",
       emptyTitle: "ഫലങ്ങൾ ലഭിച്ചില്ല",
       emptyDescription:
         "മറ്റൊരു spelling ശ്രമിക്കുകയോ filters clear ചെയ്യുകയോ ചെയ്യൂ. വലിയ dataset-ലും തിരച്ചിൽ സഹായിക്കാൻ ഈ പേജ് query-based filtering ഉപയോഗിക്കുന്നു.",
       loadingTitle: "സസ്യങ്ങൾ ലോഡ് ചെയ്യുന്നു",
       loadingDescription: "ഔഷധസസ്യങ്ങളുടെ വിവരങ്ങൾ കൊണ്ടുവരുന്നു.",
+      missingPlantTitle: "ഈ ഷെയർ ചെയ്ത സസ്യം ലഭ്യമല്ല",
+      missingPlantDescription:
+        "ഈ link പഴയതായിരിക്കാം അല്ലെങ്കിൽ സസ്യവിവരം ഇപ്പോൾ ലഭ്യമല്ല. താഴെയുള്ള button ഉപയോഗിച്ച് മറ്റ് സസ്യങ്ങൾ പരിശോധിക്കാം.",
       errorTitle: "ഡാറ്റ ലഭ്യമാക്കാനായില്ല",
       errorDescription: "Firestore connection വീണ്ടും പരിശോധിച്ച് കുറച്ച് നേരം കഴിഞ്ഞ് ശ്രമിക്കൂ.",
       noCatalogTitle: "ഇനിയും സസ്യങ്ങൾ ചേർത്തിട്ടില്ല",
@@ -268,7 +291,7 @@ const content = {
     },
     footerLabel: "അറിയിപ്പ്",
     footer:
-      "ഈ വെബ്സൈറ്റ് വിദ്യാഭ്യാസ ആവശ്യങ്ങൾക്കായാണ്. ചികിത്സയ്ക്കായി ഔഷധസസ്യങ്ങൾ ഉപയോഗിക്കുന്നതിന് മുമ്പ് യോഗ്യനായ ആരോഗ്യവിദഗ്ധന്റെ ഉപദേശം തേടുക.",
+      "ഈ വിവരങ്ങൾ പരമ്പരാഗത അറിവിനെ അടിസ്ഥാനമാക്കിയതാണ്. ഏതെങ്കിലും സസ്യം അല്ലെങ്കിൽ ചികിത്സാമാർഗം ഉപയോഗിക്കുന്നതിന് മുമ്പ് യോഗ്യനായ മെഡിക്കൽ പ്രാക്ടീഷണറെ സമീപിക്കുക.",
     confirm: {
       cancel: "റദ്ദാക്കുക",
       signOutTitle: "സൈൻ ഔട്ട് ചെയ്യണോ?",
@@ -375,6 +398,18 @@ const content = {
       installLabel: "Install app",
       installNote: "Open the install guide here any time, even after closing the auto popup.",
       installAction: "Open install guide",
+      plantUpdatesLabel: "Plant updates",
+      plantUpdatesNote: "Receive one medicinal plant update every 3 days.",
+      plantUpdatesEnabled: "Plant updates are on",
+      plantUpdatesDisabled: "Plant updates are off",
+      plantUpdatesEveryThreeDays: "Every 3 days",
+      plantUpdatesInstallFirst: "Install the app first to receive these updates.",
+      plantUpdatesUnsupported: "Web push notifications are not supported on this device.",
+      plantUpdatesDenied:
+        "Notifications are blocked. Allow them in browser settings and then try again.",
+      plantUpdatesNotConfigured: "Push notifications are not configured yet.",
+      plantUpdatesOnLabel: "On",
+      plantUpdatesOffLabel: "Off",
       languageChoices: {
         en: "English",
         ml: "Malayalam",
@@ -437,12 +472,16 @@ const content = {
       activeFiltersLabel: "active filters",
       backToResultsLabel: "Back",
       backToSavedLabel: "Back",
+      browsePlantsLabel: "Browse plants",
       nextPlantLabel: "Next",
       emptyTitle: "No matching plants found",
       emptyDescription:
         "Try another spelling or clear your filters. The catalog search is designed to support larger datasets with layered filtering.",
       loadingTitle: "Loading plants",
       loadingDescription: "Fetching medicinal plant details.",
+      missingPlantTitle: "This shared plant link is no longer available",
+      missingPlantDescription:
+        "The link may be outdated or the plant record is unavailable right now. You can still browse the plant catalog below.",
       errorTitle: "Could not load the catalog",
       errorDescription: "Check the Firestore connection and try again.",
       noCatalogTitle: "No plants added yet",
@@ -467,7 +506,7 @@ const content = {
     },
     footerLabel: "Disclaimer",
     footer:
-      "This website is intended for educational purposes. Always consult a qualified healthcare professional before using medicinal plants for treatment.",
+      "This information is based on traditional knowledge. Consult a qualified medical practitioner before using any plant or remedy.",
     confirm: {
       cancel: "Cancel",
       signOutTitle: "Sign out?",
@@ -532,7 +571,7 @@ const desktopContent = {
   },
   footerLabel: "Disclaimer",
   footer:
-    "This website is intended for educational purposes. Always consult a qualified healthcare professional before using medicinal plants for treatment.",
+    "This information is based on traditional knowledge. Consult a qualified medical practitioner before using any plant or remedy.",
 };
 
 const navIcons = {
@@ -589,6 +628,7 @@ function getInitialAppState() {
   let query = params.get("q")?.trim() ?? "";
   let selectedPlantSlug = null;
   let plantDetailOpen = false;
+  const reservedTopLevelRoutes = new Set(["admin", "saved", "me", "search", "plants"]);
 
   if (segments[0] === "saved") {
     page = "saved";
@@ -599,6 +639,10 @@ function getInitialAppState() {
   } else if (segments[0] === "plants" && segments[1]) {
     page = "plants";
     selectedPlantSlug = segments.slice(1).join("/");
+    plantDetailOpen = true;
+  } else if (segments.length === 1 && !reservedTopLevelRoutes.has(segments[0])) {
+    page = "plants";
+    selectedPlantSlug = segments[0];
     plantDetailOpen = true;
   } else {
     const requestedPage = params.get("page");
@@ -2430,7 +2474,7 @@ function AdminPage({
                   <tbody>
                     {filteredAdminPlants.map((plant) => (
                       <tr key={plant.id} className={editingPlantId === plant.id ? "is-active" : ""}>
-                        <td>
+                        <td data-label="Plant">
                           <div className="admin-table-plant">
                             {plant.image?.src ? (
                               <img src={plant.image.src} alt={plant.image?.alt?.en || getPlantDisplayName(plant)} />
@@ -2443,14 +2487,18 @@ function AdminPage({
                             </div>
                           </div>
                         </td>
-                        <td>{plant.scientific_name}</td>
-                        <td>{plant.family?.en || "-"}</td>
-                        <td>
+                        <td data-label="Scientific name">
+                          <span className="admin-table-value">{plant.scientific_name}</span>
+                        </td>
+                        <td data-label="Family">
+                          <span className="admin-table-value">{plant.family?.en || "-"}</span>
+                        </td>
+                        <td data-label="Image">
                           <span className={plant.image?.src ? "admin-status-chip is-ready" : "admin-status-chip"}>
                             {plant.image?.src ? "Added" : "Missing"}
                           </span>
                         </td>
-                        <td>
+                        <td data-label="Actions">
                           <div className="admin-plant-actions">
                             <button
                               type="button"
@@ -2684,13 +2732,102 @@ function SavedPage({ copy, language, plants, favoritePlantIds, user, onOpenPlant
   );
 }
 
+function PlantUpdatesPreferenceCard({
+  copy,
+  capability,
+  preference,
+  isBusy,
+  errorMessage,
+  onToggle,
+  onOpenInstallPrompt,
+}) {
+  const isEnabled = Boolean(preference?.enabled);
+  const permission = preference?.permission ?? capability.permission;
+  const canToggle = capability.state === "ready";
+  let helperText = copy.me.plantUpdatesNote;
+  let statusLabel = isEnabled
+    ? copy.me.plantUpdatesEnabled
+    : copy.me.plantUpdatesDisabled;
+  let statusClassName = isEnabled
+    ? "account-status-pill is-success"
+    : "account-status-pill";
+
+  if (capability.state === "install-required") {
+    helperText = copy.me.plantUpdatesInstallFirst;
+    statusLabel = copy.me.installLabel;
+    statusClassName = "account-status-pill is-warm";
+  } else if (capability.state === "unsupported") {
+    helperText = copy.me.plantUpdatesUnsupported;
+  } else if (capability.state === "not-configured") {
+    helperText = copy.me.plantUpdatesNotConfigured;
+    statusClassName = "account-status-pill is-warm";
+  } else if (permission === "denied" && !isEnabled) {
+    helperText = copy.me.plantUpdatesDenied;
+    statusClassName = "account-status-pill is-warm";
+  }
+
+  return (
+    <div className="account-preference-card account-notification-card">
+      <div className="account-preference-copy">
+        <strong>{copy.me.plantUpdatesLabel}</strong>
+        <p>{helperText}</p>
+      </div>
+      <div className="account-notification-actions">
+        {canToggle ? (
+          <button
+            type="button"
+            className={isEnabled ? "account-toggle-switch is-on" : "account-toggle-switch"}
+            role="switch"
+            aria-checked={isEnabled}
+            aria-label={`${copy.me.plantUpdatesLabel}: ${
+              isEnabled ? copy.me.plantUpdatesOnLabel : copy.me.plantUpdatesOffLabel
+            }`}
+            onClick={onToggle}
+            disabled={isBusy}
+          >
+            <span className="account-toggle-option" aria-hidden="true">
+              {copy.me.plantUpdatesOffLabel}
+            </span>
+            <span className="account-toggle-option" aria-hidden="true">
+              {copy.me.plantUpdatesOnLabel}
+            </span>
+            <span className="account-toggle-thumb" aria-hidden="true">
+              {isEnabled ? copy.me.plantUpdatesOnLabel : copy.me.plantUpdatesOffLabel}
+            </span>
+          </button>
+        ) : capability.state === "install-required" ? (
+          <button
+            type="button"
+            className="ghost-button account-install-button"
+            onClick={onOpenInstallPrompt}
+          >
+            {copy.me.installAction}
+          </button>
+        ) : null}
+        <div className="account-status-row">
+          <span className={statusClassName}>{statusLabel}</span>
+          {isEnabled ? (
+            <span className="account-status-note">{copy.me.plantUpdatesEveryThreeDays}</span>
+          ) : null}
+        </div>
+        {errorMessage ? <p className="account-inline-error">{errorMessage}</p> : null}
+      </div>
+    </div>
+  );
+}
+
 function MePage({
   copy,
   user,
   favoriteCount,
   language,
   canShowInstallEntry,
+  plantUpdatesCapability,
+  plantUpdatesPreference,
+  plantUpdatesPending,
+  plantUpdatesError,
   onOpenInstallPrompt,
+  onTogglePlantUpdates,
   onLanguageChange,
   onSignIn,
   onSignOut,
@@ -2772,6 +2909,17 @@ function MePage({
                     {copy.me.installAction}
                   </button>
                 </div>
+              ) : null}
+              {plantUpdatesCapability ? (
+                <PlantUpdatesPreferenceCard
+                  copy={copy}
+                  capability={plantUpdatesCapability}
+                  preference={plantUpdatesPreference}
+                  isBusy={plantUpdatesPending}
+                  errorMessage={plantUpdatesError}
+                  onToggle={onTogglePlantUpdates}
+                  onOpenInstallPrompt={onOpenInstallPrompt}
+                />
               ) : null}
               <button
                 type="button"
@@ -3272,6 +3420,7 @@ function PlantsPage({
   const deferredQuery = useDeferredValue(trimmedSearchQuery);
   const quickSymptoms = getTopTerms(localizedPlants, "symptoms", 5);
   const quickDiseases = getTopTerms(localizedPlants, "uses", 5);
+  const selectedPlantRecord = plants.find((plant) => plant.id === selectedPlantSlug) ?? null;
 
   useEffect(() => {
     setSearchQuery(searchSeed.query);
@@ -3370,6 +3519,17 @@ function PlantsPage({
 
   useEffect(() => {
     if (!searchResults.length) {
+      if (isLoading) {
+        return;
+      }
+
+      if (selectedPlantRecord) {
+        setIsDetailOpen(true);
+        onDetailStateChange(true);
+        setShouldAutoOpenDetail(false);
+        return;
+      }
+
       if (!shouldAutoOpenDetail) {
         setIsDetailOpen(false);
       }
@@ -3383,9 +3543,10 @@ function PlantsPage({
           (result) => result.plant.slug === selectedPlantSlug,
         )
       : false;
+    const hasSelectedPlantRecord = Boolean(selectedPlantRecord);
 
     if (shouldAutoOpenDetail) {
-      if (!hasSelectedPlant) {
+      if (!hasSelectedPlant && !hasSelectedPlantRecord) {
         onSelectPlant(searchResults[0].plant.slug);
       }
 
@@ -3396,21 +3557,24 @@ function PlantsPage({
     }
 
     if (!trimmedSearchQuery) {
-      if (!hasSelectedPlant) {
+      if (!hasSelectedPlant && !hasSelectedPlantRecord) {
         onSelectPlant(searchResults[0].plant.slug);
       }
       return;
     }
 
-    if (!hasSelectedPlant && selectedPlantSlug) {
+    if (!hasSelectedPlant && selectedPlantSlug && !hasSelectedPlantRecord) {
       onSelectPlant(null);
       setIsDetailOpen(false);
       onDetailStateChange(false);
     }
   }, [
+    isLoading,
     onDetailStateChange,
     onSelectPlant,
+    plants,
     searchResults,
+    selectedPlantRecord,
     selectedPlantSlug,
     shouldAutoOpenDetail,
     trimmedSearchQuery,
@@ -3418,7 +3582,6 @@ function PlantsPage({
 
   const selectedResult =
     searchResults.find((result) => result.plant.slug === selectedPlantSlug) ?? null;
-  const selectedPlantRecord = plants.find((plant) => plant.id === selectedPlantSlug) ?? null;
   const selectedResultIndex = selectedResult
     ? searchResults.findIndex((result) => result.plant.slug === selectedResult.plant.slug)
     : -1;
@@ -3434,6 +3597,8 @@ function PlantsPage({
     ? localizePlant(selectedPlantRecord, detailLanguage)
     : null;
   const isDetailPlantLoading = isLoading && Boolean(selectedPlantSlug);
+  const isMissingSelectedPlant =
+    Boolean(selectedPlantSlug) && !selectedDetailPlant && !isDetailPlantLoading;
   const isMalayalam = detailLanguage === "ml";
   const nextLanguage = isMalayalam ? "en" : "ml";
   const nextLanguageLabel = detailCopy.languageOptions[nextLanguage];
@@ -3517,7 +3682,7 @@ function PlantsPage({
     const shareUrl = buildAppUrl({
       language,
       page: "plants",
-      query: trimmedSearchQuery,
+      query: "",
       plantSlug: plant.slug,
       detailOpen: true,
     });
@@ -4115,6 +4280,11 @@ function PlantsPage({
                   </section>
                 )}
 
+                <section className="detail-block detail-disclaimer">
+                  <h4>{detailCopy.footerLabel}</h4>
+                  <p>{detailCopy.footer}</p>
+                </section>
+
                 <div className="detail-bottom-actions">
                   <button
                     type="button"
@@ -4139,6 +4309,14 @@ function PlantsPage({
               <div className="empty-state-card is-detail">
                 <h3>{detailLibraryCopy.loadingTitle}</h3>
                 <p>{detailLibraryCopy.loadingDescription}</p>
+              </div>
+            ) : isMissingSelectedPlant ? (
+              <div className="empty-state-card is-detail">
+                <h3>{detailLibraryCopy.missingPlantTitle}</h3>
+                <p>{detailLibraryCopy.missingPlantDescription}</p>
+                <button type="button" className="ghost-button" onClick={handleCloseDetail}>
+                  {detailLibraryCopy.browsePlantsLabel}
+                </button>
               </div>
             ) : (
               <div className="empty-state-card is-detail">
@@ -4171,31 +4349,6 @@ function PlantsPage({
               >
                 <div className="image-viewer-head">
                   <strong>{selectedDetailPlant.name}</strong>
-                  <div className="image-viewer-actions">
-                    <button
-                      type="button"
-                      className="ghost-button image-viewer-action"
-                      onClick={handleZoomOut}
-                      disabled={imageZoomLevel <= 1}
-                    >
-                      {imageViewerLabels.zoomOut}
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost-button image-viewer-action"
-                      onClick={handleZoomIn}
-                      disabled={imageZoomLevel >= 3}
-                    >
-                      {imageViewerLabels.zoomIn}
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost-button image-viewer-action"
-                      onClick={closeImageViewer}
-                    >
-                      {imageViewerLabels.close}
-                    </button>
-                  </div>
                 </div>
                 <div className="image-viewer-canvas">
                   <img
@@ -4204,6 +4357,31 @@ function PlantsPage({
                     alt={selectedDetailPlant.image.alt}
                     style={{ transform: `scale(${imageZoomLevel})` }}
                   />
+                </div>
+                <div className="image-viewer-actions">
+                  <button
+                    type="button"
+                    className="ghost-button image-viewer-action"
+                    onClick={handleZoomOut}
+                    disabled={imageZoomLevel <= 1}
+                  >
+                    {imageViewerLabels.zoomOut}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button image-viewer-action"
+                    onClick={handleZoomIn}
+                    disabled={imageZoomLevel >= 3}
+                  >
+                    {imageViewerLabels.zoomIn}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button image-viewer-action"
+                    onClick={closeImageViewer}
+                  >
+                    {imageViewerLabels.close}
+                  </button>
                 </div>
               </section>
             </div>
@@ -4333,6 +4511,9 @@ export default function App() {
     getInstallPromptDismissedForever(),
   );
   const [isInstallPromptManuallyOpen, setIsInstallPromptManuallyOpen] = useState(false);
+  const [plantUpdatesPreference, setPlantUpdatesPreference] = useState(null);
+  const [plantUpdatesPending, setPlantUpdatesPending] = useState(false);
+  const [plantUpdatesError, setPlantUpdatesError] = useState("");
   const [isStandaloneMode, setIsStandaloneMode] = useState(() => isStandaloneApp());
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (typeof window === "undefined") {
@@ -4347,6 +4528,12 @@ export default function App() {
     ? localizePlant(selectedPlantRecord, language)
     : null;
   const installPlatform = isMobileViewport ? detectInstallPlatform() : null;
+  const plantUpdatesCapability = user
+    ? getPlantUpdatesCapability({
+        isStandaloneMode,
+        installPlatform,
+      })
+    : null;
   const canTriggerNativeInstall = installPlatform === "android" && Boolean(deferredInstallPrompt);
   const shouldAutoShowInstallPrompt =
     Boolean(user) &&
@@ -4448,6 +4635,35 @@ export default function App() {
       () => setFavoritePlantIds([]),
     );
   }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setPlantUpdatesPreference(null);
+      setPlantUpdatesError("");
+      setPlantUpdatesPending(false);
+      return undefined;
+    }
+
+    return watchPlantUpdatesPreference(
+      user.uid,
+      (nextPreference) => {
+        setPlantUpdatesPreference(nextPreference);
+        setPlantUpdatesPending(false);
+      },
+      () => {
+        setPlantUpdatesError("Could not load plant updates right now.");
+        setPlantUpdatesPending(false);
+      },
+    );
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !plantUpdatesPreference?.enabled) {
+      return;
+    }
+
+    void syncPlantUpdatesLanguage(user.uid, language);
+  }, [language, plantUpdatesPreference?.enabled, user]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -4841,6 +5057,52 @@ export default function App() {
     setIsInstallPromptManuallyOpen(true);
   }
 
+  async function handleTogglePlantUpdates() {
+    if (!user || !plantUpdatesCapability) {
+      return;
+    }
+
+    if (plantUpdatesCapability.state === "install-required") {
+      openInstallPromptManually();
+      return;
+    }
+
+    if (plantUpdatesCapability.state !== "ready") {
+      setPlantUpdatesError(
+        plantUpdatesCapability.state === "unsupported"
+          ? copy.me.plantUpdatesUnsupported
+          : copy.me.plantUpdatesNotConfigured,
+      );
+      return;
+    }
+
+    setPlantUpdatesPending(true);
+    setPlantUpdatesError("");
+
+    try {
+      if (plantUpdatesPreference?.enabled) {
+        await disablePlantUpdates(user.uid);
+      } else {
+        const result = await enablePlantUpdates({
+          userId: user.uid,
+          language,
+        });
+
+        if (result.permission !== "granted") {
+          setPlantUpdatesError(copy.me.plantUpdatesDenied);
+        }
+      }
+    } catch (error) {
+      setPlantUpdatesError(
+        error instanceof Error && error.message
+          ? error.message
+          : "Could not update plant notifications right now.",
+      );
+    } finally {
+      setPlantUpdatesPending(false);
+    }
+  }
+
   if (page === "admin") {
     return (
       <div className="app-shell admin-shell">
@@ -4926,7 +5188,12 @@ export default function App() {
               favoriteCount={favoritePlantIds.length}
               language={language}
               canShowInstallEntry={Boolean(installPlatform) && !isStandaloneMode}
+              plantUpdatesCapability={plantUpdatesCapability}
+              plantUpdatesPreference={plantUpdatesPreference}
+              plantUpdatesPending={plantUpdatesPending}
+              plantUpdatesError={plantUpdatesError}
               onOpenInstallPrompt={openInstallPromptManually}
+              onTogglePlantUpdates={handleTogglePlantUpdates}
               onLanguageChange={setLanguage}
               onSignIn={handleSignIn}
               onSignOut={requestSignOut}

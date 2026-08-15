@@ -1409,6 +1409,9 @@ main {
 .plant-detail-card {
   position: sticky;
   top: 6.25rem;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fcf6 100%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -1605,8 +1608,8 @@ main {
 .image-viewer-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  justify-content: flex-start;
+  gap: 0.75rem;
 }
 
 .image-viewer-head strong {
@@ -1623,6 +1626,7 @@ main {
   justify-content: flex-end;
   gap: 0.55rem;
   flex-wrap: wrap;
+  padding-top: 0.2rem;
 }
 
 .image-viewer-action {
@@ -1746,6 +1750,25 @@ main {
   margin: 0;
   color: var(--muted);
   overflow-wrap: anywhere;
+}
+
+.detail-disclaimer {
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(170, 132, 74, 0.22);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(255, 248, 236, 0.96), rgba(252, 244, 226, 0.92));
+  box-shadow: 0 8px 18px rgba(98, 72, 28, 0.05);
+}
+
+.detail-disclaimer h4 {
+  color: #7b5a27;
+  font-size: 0.9rem;
+}
+
+.detail-disclaimer p {
+  color: #6b5a3a;
+  font-size: 0.92rem;
+  line-height: 1.55;
 }
 
 .detail-pill {
@@ -2274,6 +2297,132 @@ main {
 
 .account-note {
   margin: 0;
+}
+
+.account-notification-card {
+  gap: 0.95rem;
+}
+
+.account-notification-actions {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.account-toggle-switch {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  width: min(100%, 6.75rem);
+  min-width: 6.75rem;
+  padding: 0.24rem;
+  border: 1px solid rgba(47, 133, 90, 0.16);
+  border-radius: 999px;
+  background: linear-gradient(145deg, rgba(245, 249, 246, 0.98), rgba(226, 236, 229, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 12px 22px rgba(22, 59, 40, 0.08);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.account-toggle-switch:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.account-toggle-switch:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.account-toggle-option {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-height: 2.45rem;
+  color: rgba(48, 80, 60, 0.62);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.account-toggle-thumb {
+  position: absolute;
+  top: 0.24rem;
+  left: 0.24rem;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  width: calc(50% - 0.24rem);
+  height: calc(100% - 0.48rem);
+  border-radius: 999px;
+  background: linear-gradient(145deg, #dbe4de, #c5d3ca);
+  color: #385642;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  box-shadow:
+    0 8px 16px rgba(53, 82, 64, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42);
+  transition:
+    transform 220ms ease,
+    background 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.account-toggle-switch.is-on .account-toggle-thumb {
+  transform: translateX(100%);
+  background: linear-gradient(145deg, var(--primary), var(--primary-deep));
+  color: #ffffff;
+  box-shadow:
+    0 10px 18px rgba(33, 105, 69, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.account-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.account-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.34rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(239, 243, 240, 0.96);
+  color: #587064;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.account-status-pill.is-success {
+  background: rgba(232, 247, 238, 0.92);
+  color: var(--primary-deep);
+}
+
+.account-status-pill.is-warm {
+  background: rgba(255, 246, 230, 0.94);
+  color: #8a6530;
+}
+
+.account-status-note {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.account-inline-error {
+  margin: 0;
+  color: #8c4d32;
+  font-size: 0.86rem;
+  line-height: 1.45;
 }
 
 .confirm-dialog-backdrop {
@@ -2810,6 +2959,12 @@ main {
   font-size: 0.9rem;
 }
 
+.admin-table-value {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .admin-status-chip {
   display: inline-flex;
   align-items: center;
@@ -3218,7 +3373,7 @@ main {
     transition: transform 220ms ease;
     overscroll-behavior: contain;
     touch-action: pan-y;
-    background: var(--surface);
+    background: linear-gradient(180deg, #ffffff 0%, #f8fcf6 100%);
   }
 
   .plant-detail-card.is-open {
@@ -3428,6 +3583,104 @@ main {
 
   body.detail-open .plant-detail-card {
     padding-bottom: calc(1.2rem + env(safe-area-inset-bottom));
+  }
+
+  .admin-page-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .admin-page-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-page-nav .toggle-chip {
+    flex: 0 0 auto;
+  }
+
+  .admin-existing-toolbar {
+    gap: 0.75rem;
+  }
+
+  .admin-toolbar-actions {
+    align-items: stretch;
+  }
+
+  .admin-toolbar-actions .ghost-button {
+    width: 100%;
+  }
+
+  .admin-table-wrap {
+    overflow: visible;
+  }
+
+  .admin-table {
+    min-width: 0;
+  }
+
+  .admin-table thead {
+    display: none;
+  }
+
+  .admin-table,
+  .admin-table tbody,
+  .admin-table tr,
+  .admin-table td {
+    display: block;
+  }
+
+  .admin-table tbody {
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  .admin-table tbody tr {
+    padding: 1rem;
+    border: 1px solid rgba(47, 133, 90, 0.1);
+    border-radius: 1.2rem;
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: 0 10px 24px rgba(22, 59, 40, 0.04);
+  }
+
+  .admin-table td {
+    display: grid;
+    grid-template-columns: minmax(5.5rem, 6.5rem) minmax(0, 1fr);
+    align-items: start;
+    gap: 0.7rem;
+    padding: 0.35rem 0;
+    border-bottom: 0;
+    min-width: 0;
+  }
+
+  .admin-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.3;
+    padding-top: 0.18rem;
+  }
+
+  .admin-table td:last-child {
+    padding-top: 0.55rem;
+  }
+
+  .admin-table-plant {
+    align-items: flex-start;
+  }
+
+  .admin-plant-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .admin-plant-actions .ghost-button {
+    flex: 1 1 0;
+    min-width: 0;
   }
 }
 

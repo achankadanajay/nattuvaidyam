@@ -1,77 +1,74 @@
-const CACHE_NAME = "nattuvaidyam-shell-v3";
-const APP_SHELL = [
-  "/",
-  "/manifest.webmanifest?v=20260802a",
-  "/favicon/favicon.ico?v=20260802a",
-  "/favicon/favicon.svg?v=20260802a",
-  "/favicon/favicon-96x96.png?v=20260802a",
-  "/favicon/apple-touch-icon.png?v=20260802a",
-  "/favicon/web-app-manifest-192x192.png?v=20260802a",
-  "/favicon/web-app-manifest-512x512.png?v=20260802a",
-];
-
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting()),
-  );
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener("push", (event) => {
+  let payload = {};
+
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = {
+      body: event.data ? event.data.text() : "",
+    };
+  }
+
+  const title = payload.title || "Nattuvaidyam";
+  const url = payload.url || "/";
+
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))),
-      )
-      .then(() => self.clients.claim()),
+    self.registration.showNotification(title, {
+      body: payload.body || "Tap to open the next medicinal plant update.",
+      icon: payload.icon || "/favicon/web-app-manifest-192x192.png",
+      badge: payload.badge || "/favicon/web-app-manifest-192x192.png",
+      image: payload.image || undefined,
+      tag: payload.tag || `plant-update-${payload.plantId || "latest"}`,
+      data: {
+        url,
+        plantId: payload.plantId || null,
+      },
+    }),
   );
 });
 
-self.addEventListener("fetch", (event) => {
-  const { request } = event;
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
 
-  if (request.method !== "GET") {
-    return;
-  }
+  const targetUrl = new URL(
+    event.notification.data?.url || "/",
+    self.location.origin,
+  ).toString();
 
-  const url = new URL(request.url);
+  event.waitUntil(
+    (async () => {
+      const windowClients = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
 
-  if (url.origin !== self.location.origin) {
-    return;
-  }
+      for (const client of windowClients) {
+        const clientUrl = new URL(client.url);
 
-  if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const cloned = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put("/", cloned));
-          return response;
-        })
-        .catch(async () => {
-          return (await caches.match(request)) || caches.match("/");
-        }),
-    );
-    return;
-  }
+        if (clientUrl.origin !== self.location.origin) {
+          continue;
+        }
 
-  event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      const networkResponse = fetch(request)
-        .then((response) => {
-          if (response.ok && response.type === "basic") {
-            const cloned = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, cloned));
-          }
+        if ("navigate" in client) {
+          await client.navigate(targetUrl);
+        }
 
-          return response;
-        })
-        .catch(() => cachedResponse);
+        await client.focus();
+        return;
+      }
 
-      return cachedResponse || networkResponse;
-    }),
+      const nextClient = await self.clients.openWindow(targetUrl);
+      if (nextClient) {
+        await nextClient.focus();
+      }
+    })(),
   );
 });
