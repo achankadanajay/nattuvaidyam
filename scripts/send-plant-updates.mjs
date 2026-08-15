@@ -149,14 +149,12 @@ function buildNotificationPayload({ plant, language, appOrigin }) {
     appOrigin,
   ).toString();
   const plantUrl = new URL(`/plants/${encodeURIComponent(plant.id)}`, appOrigin).toString();
-  const plantImage = typeof plant.image?.src === "string" ? plant.image.src.trim() : "";
 
   return {
     title,
     body: summary || plant.scientific_name || "Tap to open the plant details.",
     icon: iconUrl,
     badge: iconUrl,
-    image: plantImage || undefined,
     url: plantUrl,
     plantId: plant.id,
     tag: `plant-update-${plant.id}`,
@@ -315,7 +313,12 @@ async function main() {
     }
 
     try {
-      await webpush.sendNotification(subscription, JSON.stringify(payload));
+      const payloadJson = JSON.stringify(payload);
+      const payloadBytes = Buffer.byteLength(payloadJson, "utf8");
+
+      console.log(`Payload size for user ${userSnapshot.id}: ${payloadBytes} bytes.`);
+
+      await webpush.sendNotification(subscription, payloadJson);
 
       await userSnapshot.ref.set(
         {
@@ -337,6 +340,12 @@ async function main() {
         error && typeof error === "object" && "statusCode" in error
           ? Number(error.statusCode)
           : 0;
+      const bodyText =
+        error && typeof error === "object" && "body" in error
+          ? String(error.body)
+          : "";
+      const headers =
+        error && typeof error === "object" && "headers" in error ? error.headers : undefined;
       const message =
         error instanceof Error ? error.message : "Unknown web push error";
 
@@ -374,6 +383,14 @@ async function main() {
       );
 
       console.error(`Failed to send plant update to user ${userSnapshot.id}: ${message}`);
+
+      if (bodyText) {
+        console.error(`Response body: ${bodyText}`);
+      }
+
+      if (headers) {
+        console.error(`Response headers: ${JSON.stringify(headers)}`);
+      }
     }
   }
 
