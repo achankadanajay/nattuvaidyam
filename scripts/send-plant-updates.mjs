@@ -117,28 +117,28 @@ function buildNotificationBody(plant, language) {
   if (uses.length) {
     if (language === "ml") {
       return truncateText(
-        `സസ്യ ശ്രദ്ധയിൽ. പരമ്പരാഗതമായി ${joinUses(uses, language)} എന്നിവയ്ക്ക് ഉപയോഗിക്കുന്നു. കൂടുതൽ അറിയാൻ തട്ടുക.`,
+        `പരമ്പരാഗതമായി ${joinUses(uses, language)} എന്നിവയ്ക്ക് ഉപയോഗിക്കുന്നു. കൂടുതൽ അറിയാൻ തട്ടുക.`,
         140,
       );
     }
 
     return truncateText(
-      `Plant spotlight. Traditionally used for ${joinUses(uses, language)}. Tap to know more.`,
+      `Traditionally used for ${joinUses(uses, language)}. Tap to know more.`,
       140,
     );
   }
 
   if (summary) {
     if (language === "ml") {
-      return truncateText(`സസ്യ ശ്രദ്ധയിൽ. ${summary} കൂടുതൽ അറിയാൻ തട്ടുക.`, 140);
+      return truncateText(`${summary} കൂടുതൽ അറിയാൻ തട്ടുക.`, 140);
     }
 
-    return truncateText(`Plant spotlight. ${summary} Tap to know more.`, 140);
+    return truncateText(`${summary} Tap to know more.`, 140);
   }
 
   return language === "ml"
-    ? "സസ്യ ശ്രദ്ധയിൽ. കൂടുതൽ അറിയാൻ തട്ടുക."
-    : "Plant spotlight. Tap to know more.";
+    ? "കൂടുതൽ അറിയാൻ തട്ടുക."
+    : "Tap to know more.";
 }
 
 function getNotificationOrder(plant) {
