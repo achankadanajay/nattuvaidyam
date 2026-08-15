@@ -20,6 +20,11 @@ function parseBooleanEnv(name) {
   return process.env[name]?.trim().toLowerCase() === "true";
 }
 
+function readOptionalEnv(name) {
+  const value = process.env[name]?.trim();
+  return value ? value : "";
+}
+
 function parseServiceAccount() {
   const raw = readRequiredEnv("FIREBASE_SERVICE_ACCOUNT");
 
@@ -163,6 +168,7 @@ function createSummaryTracker() {
     subscriptionsChecked: 0,
     dueUsers: 0,
     sent: 0,
+    skippedDisabled: 0,
     skippedNotDue: 0,
     skippedMissingPlant: 0,
     disabledInvalidSubscription: 0,
@@ -177,6 +183,8 @@ async function main() {
   const appOrigin = process.env.PLANT_UPDATES_APP_ORIGIN?.trim() || DEFAULT_APP_ORIGIN;
   const contactEmail = process.env.WEB_PUSH_CONTACT_EMAIL?.trim() || DEFAULT_CONTACT;
   const isDryRun = parseBooleanEnv("PLANT_UPDATES_DRY_RUN");
+  const forceUserId = readOptionalEnv("PLANT_UPDATES_FORCE_UID");
+  const ignoreSchedule = parseBooleanEnv("PLANT_UPDATES_IGNORE_SCHEDULE");
 
   initializeApp({
     credential: cert(serviceAccount),
@@ -188,10 +196,12 @@ async function main() {
   const summary = createSummaryTracker();
   const now = Date.now();
 
-  const [plantsSnapshot, usersSnapshot] = await Promise.all([
-    db.collection("plants").get(),
-    db.collection("users").where("plantUpdates.enabled", "==", true).get(),
-  ]);
+  const plantsPromise = db.collection("plants").get();
+  const usersPromise = forceUserId
+    ? db.collection("users").doc(forceUserId).get()
+    : db.collection("users").where("plantUpdates.enabled", "==", true).get();
+
+  const [plantsSnapshot, usersResult] = await Promise.all([plantsPromise, usersPromise]);
 
   const plants = plantsSnapshot.docs
     .map((snapshot) => ({
@@ -206,15 +216,35 @@ async function main() {
     return;
   }
 
+  const userDocs = forceUserId
+    ? usersResult.exists
+      ? [usersResult]
+      : []
+    : usersResult.docs;
+
   console.log(
-    `Loaded ${plants.length} plants and ${usersSnapshot.size} subscribed users${isDryRun ? " (dry run)" : ""}.`,
+    `Loaded ${plants.length} plants and ${userDocs.length} targeted users${isDryRun ? " (dry run)" : ""}.`,
+  );
+  console.log(
+    `Options: forceUserId=${forceUserId || "none"}, ignoreSchedule=${ignoreSchedule}, appOrigin=${appOrigin}`,
   );
 
-  for (const userSnapshot of usersSnapshot.docs) {
+  if (forceUserId && !userDocs.length) {
+    console.log(`User document not found for forced target: ${forceUserId}`);
+    return;
+  }
+
+  for (const userSnapshot of userDocs) {
     summary.subscriptionsChecked += 1;
 
     const plantUpdates = userSnapshot.data()?.plantUpdates ?? {};
     const subscription = plantUpdates.subscription;
+
+    if (!plantUpdates.enabled) {
+      summary.skippedDisabled += 1;
+      console.log(`Skipping user ${userSnapshot.id}: plant updates are disabled.`);
+      continue;
+    }
 
     if (!isValidSubscription(subscription)) {
       summary.disabledInvalidSubscription += 1;
@@ -238,9 +268,18 @@ async function main() {
 
     const nextSendAtMs = getTimestampMillis(plantUpdates.nextSendAt);
 
-    if (nextSendAtMs && nextSendAtMs > now) {
+    if (!ignoreSchedule && nextSendAtMs && nextSendAtMs > now) {
       summary.skippedNotDue += 1;
+      console.log(
+        `Skipping user ${userSnapshot.id}: next send is due at ${new Date(nextSendAtMs).toISOString()}.`,
+      );
       continue;
+    }
+
+    if (ignoreSchedule && nextSendAtMs > now) {
+      console.log(
+        `Ignoring schedule for user ${userSnapshot.id}; next send was ${new Date(nextSendAtMs).toISOString()}.`,
+      );
     }
 
     summary.dueUsers += 1;

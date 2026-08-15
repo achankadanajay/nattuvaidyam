@@ -4,6 +4,21 @@ on:
   schedule:
     - cron: "20 4 * * *"
   workflow_dispatch:
+    inputs:
+      target_user_id:
+        description: Optional Firebase Auth user ID to target
+        required: false
+        type: string
+      ignore_schedule:
+        description: Ignore nextSendAt and send immediately
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: Log what would be sent without sending it
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: plant-updates
@@ -36,3 +51,6 @@ jobs:
           WEB_PUSH_PRIVATE_KEY: ${{ secrets.WEB_PUSH_PRIVATE_KEY }}
           WEB_PUSH_CONTACT_EMAIL: ${{ vars.WEB_PUSH_CONTACT_EMAIL }}
           PLANT_UPDATES_APP_ORIGIN: ${{ vars.PLANT_UPDATES_APP_ORIGIN }}
+          PLANT_UPDATES_FORCE_UID: ${{ inputs.target_user_id }}
+          PLANT_UPDATES_IGNORE_SCHEDULE: ${{ inputs.ignore_schedule }}
+          PLANT_UPDATES_DRY_RUN: ${{ inputs.dry_run }}
