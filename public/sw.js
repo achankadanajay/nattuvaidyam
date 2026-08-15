@@ -42,6 +42,7 @@ self.addEventListener("notificationclick", (event) => {
     event.notification.data?.url || "/",
     self.location.origin,
   ).toString();
+  const targetLocation = new URL(targetUrl);
 
   event.waitUntil(
     (async () => {
@@ -49,6 +50,48 @@ self.addEventListener("notificationclick", (event) => {
         type: "window",
         includeUncontrolled: true,
       });
+
+      const exactClient = windowClients.find((client) => {
+        try {
+          const clientUrl = new URL(client.url);
+          return (
+            clientUrl.origin === targetLocation.origin &&
+            clientUrl.pathname === targetLocation.pathname &&
+            clientUrl.search === targetLocation.search
+          );
+        } catch {
+          return false;
+        }
+      });
+
+      if (exactClient) {
+        exactClient.postMessage({
+          type: "notification-open",
+          url: targetUrl,
+          plantId: event.notification.data?.plantId || null,
+        });
+        await exactClient.focus();
+        return;
+      }
+
+      if ("openWindow" in self.clients) {
+        const openedClient = await self.clients.openWindow(targetUrl);
+
+        if (openedClient) {
+          try {
+            openedClient.postMessage({
+              type: "notification-open",
+              url: targetUrl,
+              plantId: event.notification.data?.plantId || null,
+            });
+          } catch {
+            // Some browsers return a client without an active message channel yet.
+          }
+
+          await openedClient.focus();
+          return;
+        }
+      }
 
       for (const client of windowClients) {
         const clientUrl = new URL(client.url);
