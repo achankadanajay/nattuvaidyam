@@ -1,5 +1,5 @@
 import { cert, initializeApp } from "firebase-admin/app";
-import { FieldValue, deleteField, getFirestore } from "firebase-admin/firestore";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import webpush from "web-push";
 
 const DEFAULT_APP_ORIGIN = "https://nattuvaidyam.in";
@@ -115,7 +115,7 @@ async function main() {
       {
         plantUpdates: {
           lastTestSentAt: FieldValue.serverTimestamp(),
-          lastError: deleteField(),
+          lastError: FieldValue.delete(),
           updatedAt: FieldValue.serverTimestamp(),
         },
       },
