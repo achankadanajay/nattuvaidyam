@@ -113,32 +113,31 @@ function joinUses(items, language) {
 function buildNotificationBody(plant, language) {
   const uses = getLocalizedList(plant.medicinal_uses, language);
   const summary = truncateText(getPlantSummary(plant, language), 92);
+  const cta = language === "ml" ? "കൂടുതൽ അറിയാൻ തട്ടുക." : "Tap to know more.";
 
   if (uses.length) {
     if (language === "ml") {
       return truncateText(
-        `പരമ്പരാഗതമായി ${joinUses(uses, language)} എന്നിവയ്ക്ക് ഉപയോഗിക്കുന്നു. കൂടുതൽ അറിയാൻ തട്ടുക.`,
+        `പരമ്പരാഗതമായി ${joinUses(uses, language)} എന്നിവയ്ക്ക് ഉപയോഗിക്കുന്നു.\n${cta}`,
         140,
       );
     }
 
     return truncateText(
-      `Traditionally used for ${joinUses(uses, language)}. Tap to know more.`,
+      `Traditionally used for ${joinUses(uses, language)}.\n${cta}`,
       140,
     );
   }
 
   if (summary) {
     if (language === "ml") {
-      return truncateText(`${summary} കൂടുതൽ അറിയാൻ തട്ടുക.`, 140);
+      return truncateText(`${summary}\n${cta}`, 140);
     }
 
-    return truncateText(`${summary} Tap to know more.`, 140);
+    return truncateText(`${summary}\n${cta}`, 140);
   }
 
-  return language === "ml"
-    ? "കൂടുതൽ അറിയാൻ തട്ടുക."
-    : "Tap to know more.";
+  return cta;
 }
 
 function getNotificationOrder(plant) {
