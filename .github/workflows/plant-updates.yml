@@ -2,7 +2,8 @@ name: Plant Updates
 
 on:
   schedule:
-    - cron: "20 4 * * *"
+    # 14:00 UTC = 7:30 PM IST
+    - cron: "0 14 * * *"
   workflow_dispatch:
     inputs:
       target_user_id:
