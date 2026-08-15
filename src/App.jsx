@@ -2751,7 +2751,7 @@ function PlantUpdatesPreferenceCard({
 }) {
   const isEnabled = Boolean(preference?.enabled);
   const permission = preference?.permission ?? capability.permission;
-  const canToggle = capability.state === "ready" || isEnabled;
+  const canToggle = capability.state !== "unsupported";
   let helperText = copy.me.plantUpdatesNote;
   let statusLabel = isEnabled
     ? copy.me.plantUpdatesEnabled
@@ -2802,14 +2802,6 @@ function PlantUpdatesPreferenceCard({
             <span className="account-toggle-thumb" aria-hidden="true">
               {isEnabled ? copy.me.plantUpdatesOnLabel : copy.me.plantUpdatesOffLabel}
             </span>
-          </button>
-        ) : capability.state === "install-required" ? (
-          <button
-            type="button"
-            className="ghost-button account-install-button"
-            onClick={onOpenInstallPrompt}
-          >
-            {copy.me.installAction}
           </button>
         ) : null}
         <div className="account-status-row">
