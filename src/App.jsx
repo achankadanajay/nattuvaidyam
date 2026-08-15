@@ -198,7 +198,7 @@ const content = {
       plantUpdatesOffLabel: "ഓഫ്",
       malayalamComingSoonTitle: "Malayalam is coming soon",
       malayalamComingSoonMessage:
-        "We are still refining the Malayalam translation. For now, this section is available only in English.",
+        "We are still refining the Malayalam translation. For now, this is available only in English.",
       malayalamComingSoonAction: "OK",
       languageChoices: {
         en: "English",
@@ -416,7 +416,7 @@ const content = {
       plantUpdatesOffLabel: "Off",
       malayalamComingSoonTitle: "Malayalam is coming soon",
       malayalamComingSoonMessage:
-        "We are still refining the Malayalam translation. For now, this section is available only in English.",
+        "We are still refining the Malayalam translation. For now, this is available only in English.",
       malayalamComingSoonAction: "OK",
       languageChoices: {
         en: "English",
